@@ -44,7 +44,19 @@ export default function SettingsScreen({ state, setState, onBack }) {
       ...prev,
       settings: {
         ...prev.settings,
-        accessories: (prev.settings.accessories || []).map((a) => (a.id === id ? { ...a, isActive: !a.isActive } : a)),
+        accessories: prev.settings.accessories.map((a) =>
+          a.id === id ? { ...a, isActive: !a.isActive } : a
+        ),
+      },
+    }));
+  }
+
+  function deleteAccessory(id) {
+    setState((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        accessories: prev.settings.accessories.filter((a) => a.id !== id),
       },
     }));
   }
@@ -53,13 +65,19 @@ export default function SettingsScreen({ state, setState, onBack }) {
     const name = accName.trim();
     const price = toNum(accPrice);
     if (!name || !price) return;
-    const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now() + Math.random());
+
+    const id =
+      (crypto.randomUUID && crypto.randomUUID()) ||
+      String(Date.now() + Math.random());
 
     setState((prev) => ({
       ...prev,
       settings: {
         ...prev.settings,
-        accessories: [{ id, name, unitPrice: price, isActive: true }, ...(prev.settings.accessories || [])],
+        accessories: [
+          { id, name, unitPrice: price, isActive: true },
+          ...prev.settings.accessories,
+        ],
       },
     }));
 
@@ -67,69 +85,129 @@ export default function SettingsScreen({ state, setState, onBack }) {
     setAccPrice("");
   }
 
-  const card = { border: "1px solid #eee", borderRadius: 16, padding: 14, background: "#fff", boxShadow: "0 6px 18px rgba(0,0,0,0.04)" };
+  const card = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 18,
+    padding: 16,
+    background: "#ffffff",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
+  };
+
+  const input = {
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid #ddd",
+    width: "100%",
+  };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f6f7fb" }}>
-      <div style={{ maxWidth: 560, margin: "0 auto", padding: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <button onClick={onBack} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #ddd", background: "#fff" }}>
-            ← Geri
-          </button>
-          <div style={{ fontWeight: 900 }}>Ayarlar</div>
+    <div style={{ minHeight: "100vh", background: "#f3f4f6" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <button onClick={onBack}>← Geri</button>
+          <h2>Ayarlar</h2>
         </div>
 
-        <div style={{ ...card, marginTop: 12 }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Malzeme Birim Fiyatları</div>
-          <div style={{ display: "grid", gap: 8 }}>
-            <input value={mdf} onChange={(e) => setMdf(e.target.value)} placeholder="MDFLAM" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
-            <input value={hg} onChange={(e) => setHg(e.target.value)} placeholder="High Gloss" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
-            <input value={lp} onChange={(e) => setLp(e.target.value)} placeholder="Lak Panel" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
-            <input value={lake} onChange={(e) => setLake(e.target.value)} placeholder="Lake" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
+        {/* MALZEMELER */}
+        <div style={{ ...card, marginTop: 16 }}>
+          <h3>Malzeme Birim Fiyatları (₺ / metre)</h3>
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            <div>
+              <label>MDFLAM</label>
+              <input value={mdf} onChange={(e) => setMdf(e.target.value)} style={input} />
+            </div>
+            <div>
+              <label>High Gloss</label>
+              <input value={hg} onChange={(e) => setHg(e.target.value)} style={input} />
+            </div>
+            <div>
+              <label>Lak Panel</label>
+              <input value={lp} onChange={(e) => setLp(e.target.value)} style={input} />
+            </div>
+            <div>
+              <label>Lake</label>
+              <input value={lake} onChange={(e) => setLake(e.target.value)} style={input} />
+            </div>
           </div>
         </div>
 
-        <div style={{ ...card, marginTop: 12 }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Sabit Kalemler</div>
-          <div style={{ display: "grid", gap: 8 }}>
-            <input value={door} onChange={(e) => setDoor(e.target.value)} placeholder="Kapı birim fiyat (adet)" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
-            <input value={sk} onChange={(e) => setSk(e.target.value)} placeholder="Süpürgelik (₺/m)" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
+        {/* SABİT KALEMLER */}
+        <div style={{ ...card, marginTop: 16 }}>
+          <h3>Sabit Kalemler</h3>
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            <div>
+              <label>Kapı (adet fiyat)</label>
+              <input value={door} onChange={(e) => setDoor(e.target.value)} style={input} />
+            </div>
+            <div>
+              <label>Süpürgelik (₺ / metre)</label>
+              <input value={sk} onChange={(e) => setSk(e.target.value)} style={input} />
+            </div>
           </div>
         </div>
 
-        <div style={{ ...card, marginTop: 12 }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Aksesuarlar (aktif/pasif)</div>
+        {/* AKSESUARLAR */}
+        <div style={{ ...card, marginTop: 16 }}>
+          <h3>Aksesuarlar</h3>
 
-          <div style={{ display: "grid", gap: 8, marginBottom: 10 }}>
-            <input value={accName} onChange={(e) => setAccName(e.target.value)} placeholder="Yeni aksesuar adı" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
-            <input value={accPrice} onChange={(e) => setAccPrice(e.target.value)} placeholder="Birim fiyat (₺)" style={{ padding: 12, borderRadius: 12, border: "1px solid #ddd" }} />
-            <button onClick={addAccessory} style={{ padding: 12, borderRadius: 12, border: 0, background: "#111", color: "#fff", fontWeight: 900 }}>
-              + Aksesuar Ekle
-            </button>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            <input
+              placeholder="Yeni aksesuar adı"
+              value={accName}
+              onChange={(e) => setAccName(e.target.value)}
+              style={input}
+            />
+            <input
+              placeholder="Birim fiyat (₺)"
+              value={accPrice}
+              onChange={(e) => setAccPrice(e.target.value)}
+              style={input}
+            />
+            <button onClick={addAccessory}>+ Aksesuar Ekle</button>
           </div>
 
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
             {accessories.map((a) => (
-              <div key={a.id} style={{ border: "1px solid #eee", borderRadius: 14, padding: 12, background: "#fff" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div key={a.id} style={{ border: "1px solid #eee", padding: 12, borderRadius: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontWeight: 900 }}>{a.name}</div>
-                    <div style={{ color: "#666", fontSize: 12 }}>{a.isActive ? "Aktif" : "Pasif"} • {a.unitPrice} ₺</div>
+                    <strong>{a.name}</strong>
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      {a.unitPrice} ₺ • {a.isActive ? "Aktif" : "Pasif"}
+                    </div>
                   </div>
-                  <button onClick={() => toggleAccessory(a.id)} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #ddd", background: "#fff", fontWeight: 900 }}>
-                    {a.isActive ? "Pasif yap" : "Aktif yap"}
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => toggleAccessory(a.id)}>
+                      {a.isActive ? "Pasif yap" : "Aktif yap"}
+                    </button>
+                    <button
+                      onClick={() => deleteAccessory(a.id)}
+                      style={{ background: "#dc2626", color: "#fff" }}
+                    >
+                      Sil
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <button onClick={save} style={{ width: "100%", marginTop: 12, padding: 14, borderRadius: 14, border: 0, background: "#111", color: "#fff", fontWeight: 900 }}>
+        <button
+          onClick={save}
+          style={{
+            marginTop: 20,
+            width: "100%",
+            padding: 14,
+            borderRadius: 14,
+            border: 0,
+            background: "#111",
+            color: "#fff",
+            fontWeight: 700,
+          }}
+        >
           Kaydet
         </button>
-
-        <div style={{ height: 24 }} />
       </div>
     </div>
   );
