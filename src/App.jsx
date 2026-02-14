@@ -4,7 +4,7 @@ import ProjectsScreen from "./screens/ProjectsScreen.jsx";
 import ProjectScreen from "./screens/ProjectScreen.jsx";
 import SettingsScreen from "./screens/SettingsScreen.jsx";
 
-import { loadState, saveState } from "./core/storage.js";
+import { loadState, saveState } from "./core/storage";
 
 /** Basit error boundary: runtime patlarsa beyaz ekran yerine hata yazar */
 class ErrorBoundary extends React.Component {
