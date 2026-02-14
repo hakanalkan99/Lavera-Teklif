@@ -1,19 +1,32 @@
 import React, { useMemo, useState } from "react";
 
-const LS_KEY = "lavera_auth_ok_v1";
+const LS_OK_KEY = "lavera_auth_ok_v1";
+const LS_CREDS_KEY = "lavera_auth_creds_v1";
+
+// Varsayılan (ilk kurulumda)
+const DEFAULT_CREDS = { user: "lavera", pass: "1234" };
+
+function loadCreds() {
+  try {
+    const raw = localStorage.getItem(LS_CREDS_KEY);
+    if (!raw) return DEFAULT_CREDS;
+    const parsed = JSON.parse(raw);
+    const user = String(parsed?.user ?? DEFAULT_CREDS.user);
+    const pass = String(parsed?.pass ?? DEFAULT_CREDS.pass);
+    return { user, pass };
+  } catch {
+    return DEFAULT_CREDS;
+  }
+}
 
 export default function AuthGate({ children }) {
-  // Şifreyi buradan değiştirebilirsin (istersen sonra Ayarlar sayfasına da bağlarız)
-  const DEFAULT_USER = "lavera";
-  const DEFAULT_PASS = "1234";
-
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
 
   const isAuthed = useMemo(() => {
     try {
-      return localStorage.getItem(LS_KEY) === "1";
+      return localStorage.getItem(LS_OK_KEY) === "1";
     } catch {
       return false;
     }
@@ -23,9 +36,11 @@ export default function AuthGate({ children }) {
 
   function login() {
     setError("");
-    if (user.trim() === DEFAULT_USER && pass === DEFAULT_PASS) {
+    const creds = loadCreds();
+
+    if (user.trim() === creds.user && pass === creds.pass) {
       try {
-        localStorage.setItem(LS_KEY, "1");
+        localStorage.setItem(LS_OK_KEY, "1");
       } catch {}
       setOk(true);
       return;
@@ -35,7 +50,7 @@ export default function AuthGate({ children }) {
 
   function logout() {
     try {
-      localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(LS_OK_KEY);
     } catch {}
     setOk(false);
     setUser("");
@@ -43,7 +58,6 @@ export default function AuthGate({ children }) {
   }
 
   if (ok) {
-    // Sağ üst mini çıkış butonu
     return (
       <div style={{ minHeight: "100vh" }}>
         <div style={{ position: "fixed", top: 12, right: 12, zIndex: 9999 }}>
@@ -141,12 +155,6 @@ export default function AuthGate({ children }) {
           >
             Giriş Yap
           </button>
-
-          <div style={{ opacity: 0.7, fontSize: 12, marginTop: 6 }}>
-            Demo kullanıcı: <b>{DEFAULT_USER}</b> — şifre: <b>{DEFAULT_PASS}</b>
-            <br />
-            (Bunu sonra gizleriz, şimdilik test için gösterdim.)
-          </div>
         </div>
       </div>
     </div>
