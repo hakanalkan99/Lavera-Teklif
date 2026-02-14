@@ -1,26 +1,20 @@
-import React, { useEffect, useState } from "react";
-import type { PersistedState } from "./core/types";
+import { useEffect, useState } from "react";
 import { loadState, saveState } from "./core/storage";
-import { Screen } from "./ui/ui";
+
 import ProjectsScreen from "./screens/ProjectsScreen";
 import ProjectScreen from "./screens/ProjectScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 
-type Route =
-  | { name: "projects" }
-  | { name: "project"; projectId: string }
-  | { name: "settings" };
-
 export default function App() {
-  const [route, setRoute] = useState<Route>({ name: "projects" });
-  const [state, setState] = useState<PersistedState>(() => loadState());
+  const [route, setRoute] = useState({ name: "projects" });
+  const [state, setState] = useState(() => loadState());
 
   useEffect(() => {
     saveState(state);
   }, [state]);
 
   return (
-    <Screen>
+    <div style={{ minHeight: "100vh" }}>
       {route.name === "projects" && (
         <ProjectsScreen
           state={state}
@@ -42,6 +36,6 @@ export default function App() {
       {route.name === "settings" && (
         <SettingsScreen state={state} setState={setState} onBack={() => setRoute({ name: "projects" })} />
       )}
-    </Screen>
+    </div>
   );
 }

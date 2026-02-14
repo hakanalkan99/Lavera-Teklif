@@ -1,8 +1,6 @@
-import type { PersistedState } from "./types";
-
 const STORAGE_KEY = "mobilya_teklif_v1";
 
-export function loadState(): PersistedState {
+export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -10,42 +8,43 @@ export function loadState(): PersistedState {
         projects: [],
         settings: {
           materialPrices: {
-            MDFLAM: 8000,
-            HGloss: 9500,
-            LakPanel: 11000,
-            Lake: 13500,
+            mdfLam: 100,
+            highGloss: 120,
+            lakPanel: 150,
+            lake: 200,
           },
-          doorPrice: 12000,
-          skirtingPricePerMeter: 350,
-          puffExtraPrice: 2500,
           accessories: [],
-          companyInfo: {},
           nextProjectNumber: 2620,
+          doorPrice: 12000,
+          skirtingPricePerMeter: 300,
+          puffExtraPrice: 2500,
+          companyInfo: {},
         },
       };
     }
     return JSON.parse(raw);
-  } catch {
+  } catch (e) {
+    console.error("Load error:", e);
     return {
       projects: [],
       settings: {
         materialPrices: {
-          MDFLAM: 8000,
-          HGloss: 9500,
-          LakPanel: 11000,
-          Lake: 13500,
+          mdfLam: 100,
+          highGloss: 120,
+          lakPanel: 150,
+          lake: 200,
         },
-        doorPrice: 12000,
-        skirtingPricePerMeter: 350,
-        puffExtraPrice: 2500,
         accessories: [],
-        companyInfo: {},
         nextProjectNumber: 2620,
+        doorPrice: 12000,
+        skirtingPricePerMeter: 300,
+        puffExtraPrice: 2500,
+        companyInfo: {},
       },
     };
   }
 }
 
-export function saveState(state: PersistedState) {
+export function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
