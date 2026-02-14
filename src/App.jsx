@@ -1,176 +1,132 @@
-import { useEffect, useState } from "react";
-import { supabase } from "./core/supabaseClient";
-import { cloudLoadState, cloudSaveState, defaultState } from "./core/cloudStorage";
+import React, { useEffect, useState } from "react";
 
-import ProjectsScreen from "./screens/ProjectsScreen";
-import ProjectScreen from "./screens/ProjectScreen";
-import SettingsScreen from "./screens/SettingsScreen";
+import ProjectsScreen from "./screens/ProjectsScreen.jsx";
+import ProjectScreen from "./screens/ProjectScreen.jsx";
+import SettingsScreen from "./screens/SettingsScreen.jsx";
+
+import { loadState, saveState } from "./core/storage.js";
+
+/** Basit error boundary: runtime patlarsa beyaz ekran yerine hata yazar */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, err: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, err: error };
+  }
+  componentDidCatch(error, info) {
+    // console'a da basalım
+    console.error("ErrorBoundary:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 16, fontFamily: "system-ui" }}>
+          <h2>Uygulama Hatası</h2>
+          <p style={{ color: "#666" }}>
+            Beyaz ekran yerine hatayı gösteriyorum. Bu yazıyı at bana.
+          </p>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              background: "#111",
+              color: "#fff",
+              padding: 12,
+              borderRadius: 12,
+              overflow: "auto",
+            }}
+          >
+            {String(this.state.err?.stack || this.state.err)}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function Screen({ children }) {
+  return <div style={{ minHeight: "100vh", background: "#f6f7fb" }}>{children}</div>;
+}
 
 export default function App() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  /** ROUTE */
+  const [route, setRoute] = useState({ name: "projects" }); // {name:'projects'} | {name:'project', projectId} | {name:'settings'}
 
-  const [route, setRoute] = useState({ name: "projects" });
-  const [state, setState] = useState(defaultState());
+  /** STATE */
+  const [state, setState] = useState(() => loadState());
 
-  // 1) Auth session dinle
+  /** persist */
   useEffect(() => {
-    let alive = true;
+    saveState(state);
+  }, [state]);
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!alive) return;
-        setSession(data.session || null);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setSession(null);
-        setLoading(false);
-      });
+  /** ENV CHECK (Vercel/Supabase) */
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-
-    return () => {
-      alive = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
-  // 2) Session varsa cloud’dan state çek
-  useEffect(() => {
-    if (!session) return;
-
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const st = await cloudLoadState();
-        if (!alive) return;
-        setState(st);
-      } catch (e) {
-        console.error(e);
-        alert("Cloud verisi okunamadı. Console'a bak.");
-      } finally {
-        if (!alive) return;
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [session]);
-
-  // 3) State değişince cloud’a yaz (debounce)
-  useEffect(() => {
-    if (!session) return;
-    const t = setTimeout(() => {
-      cloudSaveState(state).catch((e) => console.error("cloudSaveState error", e));
-    }, 400);
-    return () => clearTimeout(t);
-  }, [state, session]);
-
-  if (loading) {
+  // Eğer supabase entegrasyonlu build aldıysan ve env boşsa BEYAZ yerine bunu göster
+  // (Localde env yoksa ama supabase kullanmıyorsan bunu kapatabilirsin. Şimdilik açık kalsın.)
+  if (!supabaseUrl || !supabaseKey) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f6f7fb" }}>
-        <div style={{ fontWeight: 900 }}>Yükleniyor...</div>
-      </div>
+      <Screen>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: 16, fontFamily: "system-ui" }}>
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #eee",
+              borderRadius: 18,
+              padding: 14,
+              boxShadow: "0 10px 22px rgba(0,0,0,0.05)",
+            }}
+          >
+            <h2 style={{ margin: 0 }}>ENV HATASI</h2>
+            <p style={{ color: "#666" }}>
+              Vercel Environment Variables boş geliyor. Bu yüzden Supabase client çalışmıyor ve beyaz ekran oluyordu.
+            </p>
+            <pre style={{ whiteSpace: "pre-wrap", background: "#f2f3f6", padding: 12, borderRadius: 12 }}>
+VITE_SUPABASE_URL: {String(supabaseUrl)}
+VITE_SUPABASE_ANON_KEY: {supabaseKey ? supabaseKey.slice(0, 22) + "..." : String(supabaseKey)}
+            </pre>
+            <p style={{ marginTop: 10, color: "#666" }}>
+              Vercel → Project → Settings → Environment Variables:
+              <br />• VITE_SUPABASE_URL = https://xxxx.supabase.co
+              <br />• VITE_SUPABASE_ANON_KEY = sb_publishable_...
+              <br />
+              Sonra Redeploy (Clear cache).
+            </p>
+          </div>
+        </div>
+      </Screen>
     );
   }
 
-  if (!session) {
-    return <LoginScreen />;
-  }
-
   return (
-    <div>
-      {route.name === "projects" && (
-        <ProjectsScreen
-          state={state}
-          setState={setState}
-          goSettings={() => setRoute({ name: "settings" })}
-          openProject={(projectId) => setRoute({ name: "project", projectId })}
-        />
-      )}
+    <ErrorBoundary>
+      <Screen>
+        {route.name === "projects" && (
+          <ProjectsScreen
+            state={state}
+            setState={setState}
+            goSettings={() => setRoute({ name: "settings" })}
+            openProject={(projectId) => setRoute({ name: "project", projectId })}
+          />
+        )}
 
-      {route.name === "project" && (
-        <ProjectScreen
-          projectId={route.projectId}
-          state={state}
-          setState={setState}
-          onBack={() => setRoute({ name: "projects" })}
-        />
-      )}
+        {route.name === "project" && (
+          <ProjectScreen
+            projectId={route.projectId}
+            state={state}
+            setState={setState}
+            onBack={() => setRoute({ name: "projects" })}
+          />
+        )}
 
-      {route.name === "settings" && (
-        <SettingsScreen
-          state={state}
-          setState={setState}
-          onBack={() => setRoute({ name: "projects" })}
-        />
-      )}
-    </div>
-  );
-}
-
-function LoginScreen() {
-  const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function login() {
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
-      });
-      if (error) alert(error.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f6f7fb" }}>
-      <div style={{ width: 360, background: "#fff", padding: 18, borderRadius: 16, border: "1px solid #eee" }}>
-        <div style={{ fontWeight: 900, marginBottom: 10 }}>Giriş</div>
-
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #ddd", marginBottom: 8 }}
-        />
-
-        <input
-          placeholder="Şifre"
-          type="password"
-          value={pass}
-          onChange={(e) => setPass(e.target.value)}
-          style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #ddd", marginBottom: 10 }}
-        />
-
-        <button
-          onClick={login}
-          disabled={busy}
-          style={{
-            width: "100%",
-            padding: 12,
-            borderRadius: 12,
-            border: 0,
-            background: "#111",
-            color: "#fff",
-            fontWeight: 900,
-          }}
-        >
-          {busy ? "..." : "Giriş Yap"}
-        </button>
-      </div>
-    </div>
+        {route.name === "settings" && (
+          <SettingsScreen state={state} setState={setState} onBack={() => setRoute({ name: "projects" })} />
+        )}
+      </Screen>
+    </ErrorBoundary>
   );
 }
