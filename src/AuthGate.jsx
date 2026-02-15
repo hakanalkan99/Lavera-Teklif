@@ -1,79 +1,47 @@
-import React, { useMemo, useState } from "react";
-
-const LS_OK_KEY = "lavera_auth_ok_v1";
-const LS_CREDS_KEY = "lavera_auth_creds_v1";
-
-// Varsayılan (ilk kurulumda)
-const DEFAULT_CREDS = { user: "lavera", pass: "1234" };
-
-function loadCreds() {
-  try {
-    const raw = localStorage.getItem(LS_CREDS_KEY);
-    if (!raw) return DEFAULT_CREDS;
-    const parsed = JSON.parse(raw);
-    const user = String(parsed?.user ?? DEFAULT_CREDS.user);
-    const pass = String(parsed?.pass ?? DEFAULT_CREDS.pass);
-    return { user, pass };
-  } catch {
-    return DEFAULT_CREDS;
-  }
-}
+import React, { useEffect, useState } from "react";
+import { supabase } from "./core/supabaseClient";
+import { Button, Card, Input } from "./ui/ui";
 
 export default function AuthGate({ children }) {
-  const [user, setUser] = useState("");
+  const [session, setSession] = useState(null);
+  const [mode, setMode] = useState("login"); // login | signup
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
-  const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
 
-  const isAuthed = useMemo(() => {
-    try {
-      return localStorage.getItem(LS_OK_KEY) === "1";
-    } catch {
-      return false;
-    }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session || null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  const [ok, setOk] = useState(isAuthed);
-
-  function login() {
-    setError("");
-    const creds = loadCreds();
-
-    if (user.trim() === creds.user && pass === creds.pass) {
-      try {
-        localStorage.setItem(LS_OK_KEY, "1");
-      } catch {}
-      setOk(true);
-      return;
-    }
-    setError("Kullanıcı adı veya şifre yanlış.");
+  async function doLogin() {
+    setMsg("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) setMsg(error.message);
   }
 
-  function logout() {
-    try {
-      localStorage.removeItem(LS_OK_KEY);
-    } catch {}
-    setOk(false);
-    setUser("");
-    setPass("");
+  async function doSignup() {
+    setMsg("");
+    const { error } = await supabase.auth.signUp({ email, password: pass });
+    if (error) setMsg(error.message);
+    else setMsg("Kayıt alındı. Mail doğrulaması kapalıysa direkt giriş olur; açıksa mailini doğrula.");
   }
 
-  if (ok) {
+  async function doLogout() {
+    await supabase.auth.signOut();
+  }
+
+  if (session) {
     return (
-      <div style={{ minHeight: "100vh" }}>
-        <div style={{ position: "fixed", top: 12, right: 12, zIndex: 9999 }}>
-          <button
-            onClick={logout}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid #ddd",
-              background: "#fff",
-              fontWeight: 900,
-              cursor: "pointer",
-            }}
-          >
-            Çıkış
-          </button>
+      <div>
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/50 truncate">Giriş: {session.user.email}</div>
+            <Button variant="ghost" onClick={doLogout}>
+              Çıkış
+            </Button>
+          </div>
         </div>
         {children}
       </div>
@@ -81,81 +49,40 @@ export default function AuthGate({ children }) {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        background: "linear-gradient(180deg, #0b0b0f 0%, #141420 100%)",
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          background: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(255,255,255,0.10)",
-          borderRadius: 18,
-          padding: 18,
-          color: "white",
-          boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
-          backdropFilter: "blur(10px)",
-        }}
-      >
-        <div style={{ fontSize: 22, fontWeight: 900 }}>Lavera Teklif</div>
-        <div style={{ marginTop: 6, opacity: 0.8, fontSize: 13 }}>
-          Giriş yapmadan devam edemezsiniz.
-        </div>
+    <div className="min-h-screen bg-neutral-950 text-neutral-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="text-2xl font-black mb-3">Lavera Teklif</div>
+        <Card>
+          <div className="p-4 space-y-3">
+            <div className="flex gap-2">
+              <Button variant={mode === "login" ? "primary" : "ghost"} onClick={() => setMode("login")}>
+                Giriş
+              </Button>
+              <Button variant={mode === "signup" ? "primary" : "ghost"} onClick={() => setMode("signup")}>
+                Kayıt
+              </Button>
+            </div>
 
-        <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-          <input
-            value={user}
-            onChange={(e) => setUser(e.target.value)}
-            placeholder="Kullanıcı adı"
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.25)",
-              color: "white",
-              outline: "none",
-            }}
-          />
-          <input
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            placeholder="Şifre"
-            type="password"
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.25)",
-              color: "white",
-              outline: "none",
-            }}
-          />
+            <Input label="Email" value={email} onChange={setEmail} placeholder="mail@..." type="email" />
+            <Input label="Şifre" value={pass} onChange={setPass} placeholder="••••••••" type="password" />
 
-          {error ? (
-            <div style={{ color: "#ffb4b4", fontWeight: 700, fontSize: 13 }}>{error}</div>
-          ) : null}
+            {msg ? <div className="text-sm text-red-300">{msg}</div> : null}
 
-          <button
-            onClick={login}
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              border: 0,
-              background: "white",
-              color: "#111",
-              fontWeight: 900,
-              cursor: "pointer",
-            }}
-          >
-            Giriş Yap
-          </button>
-        </div>
+            {mode === "login" ? (
+              <Button onClick={doLogin} disabled={!email || !pass}>
+                Giriş Yap
+              </Button>
+            ) : (
+              <Button onClick={doSignup} disabled={!email || !pass}>
+                Kayıt Ol
+              </Button>
+            )}
+
+            <div className="text-xs text-white/40">
+              Not: Supabase Authentication → Providers → Email açık olmalı.
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

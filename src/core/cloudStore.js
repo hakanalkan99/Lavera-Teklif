@@ -1,32 +1,34 @@
 import { supabase } from "./supabaseClient";
 
-export async function loadProjectsFromCloud() {
+export async function loadCloudState() {
   const { data: userRes } = await supabase.auth.getUser();
   const user = userRes?.user;
-  if (!user) throw new Error("not_logged_in");
+  if (!user) throw new Error("No user");
 
   const { data, error } = await supabase
-    .from("projects_store")
-    .select("data")
+    .from("app_state")
+    .select("state")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) throw error;
-
-  // hiç kayıt yoksa boş döneriz
-  return data?.data?.projects ?? null;
+  return data?.state || null;
 }
 
-export async function saveProjectsToCloud(projects) {
+export async function saveCloudState(state) {
   const { data: userRes } = await supabase.auth.getUser();
   const user = userRes?.user;
-  if (!user) throw new Error("not_logged_in");
+  if (!user) throw new Error("No user");
 
-  const payload = { user_id: user.id, data: { projects }, updated_at: new Date().toISOString() };
+  const payload = {
+    user_id: user.id,
+    state,
+    updated_at: new Date().toISOString(),
+  };
 
-  const { error } = await supabase
-    .from("projects_store")
-    .upsert(payload, { onConflict: "user_id" });
+  const { error } = await supabase.from("app_state").upsert(payload, {
+    onConflict: "user_id",
+  });
 
   if (error) throw error;
 }
