@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const project = state.projects.find((p) => p.id === projectId);
@@ -32,6 +32,8 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const [draftName, setDraftName] = useState("");
   const [draftData, setDraftData] = useState({});
 
+  const offerRef = useRef(null);
+
   // ---------- HELPERS ----------
   function nowISO() {
     return new Date().toISOString();
@@ -48,7 +50,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     }
   }
   function toNum(v) {
-    const n = Number(String(v).replace(",", ".").replace(/[^0-9.]/g, ""));
+    const n = Number(String(v ?? "").replace(",", ".").replace(/[^0-9.]/g, ""));
     return Number.isFinite(n) ? n : 0;
   }
   function roundUpThousands(n) {
@@ -111,9 +113,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
   // ---------- CALCULATORS ----------
   function factorFromDims(widthCm, heightCm, depthCm) {
-    const w = Math.max(0, widthCm) / 100;
-    const h = Math.max(0, heightCm) / 100;
-    const d = Math.max(0, depthCm) / 100;
+    const w = Math.max(0, toNum(widthCm)) / 100;
+    const h = Math.max(0, toNum(heightCm)) / 100;
+    const d = Math.max(0, toNum(depthCm)) / 100;
     return w * h * (1 + d);
   }
 
@@ -205,8 +207,8 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
     let extra = 0;
     if (tip === "Tip3") {
-      extra += factorFromDims(toNum(data.wmW || 60), toNum(data.wmH || 200), toNum(data.wmD || 60));
-      extra += factorFromDims(toNum(data.panW || 45), toNum(data.panH || 200), toNum(data.panD || 60));
+      extra += factorFromDims(data.wmW || 60, data.wmH || 200, data.wmD || 60);
+      extra += factorFromDims(data.panW || 45, data.panH || 200, data.panD || 60);
     }
 
     const factor = (base + extra) * (coeff.hilton || 1);
@@ -216,21 +218,21 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   function calcSimplePrice(data) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
-    const factor = factorFromDims(toNum(data.w || 100), toNum(data.h || 100), toNum(data.d || 60));
+    const factor = factorFromDims(data.w || 100, data.h || 100, data.d || 60);
     return { factor, price: factor * unit };
   }
 
   function calcSeperatorPrice(data) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
-    const factor = factorFromDims(toNum(data.w || 100), toNum(data.h || 250), toNum(data.d || 10)) * (coeff.seperator || 1);
+    const factor = factorFromDims(data.w || 100, data.h || 250, data.d || 10) * (coeff.seperator || 1);
     return { factor, price: factor * unit };
   }
 
   function calcTvPrice(data) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
-    const factor = factorFromDims(toNum(data.w || 300), toNum(data.h || 250), toNum(data.d || 40)) * (coeff.tv || 1);
+    const factor = factorFromDims(data.w || 300, data.h || 250, data.d || 40) * (coeff.tv || 1);
     return { factor, price: factor * unit };
   }
 
@@ -297,6 +299,28 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     });
   }
 
+  async function downloadOfferJpg() {
+    try {
+      const node = offerRef.current;
+      if (!node) return;
+
+      // Paket kurmadan çalışsın diye runtime import (Vite ignore)
+      const mod = await import(/* @vite-ignore */ "https://esm.sh/html-to-image@1.11.11");
+      const toJpeg = mod.toJpeg;
+
+      const dataUrl = await toJpeg(node, { quality: 0.95, backgroundColor: "#ffffff" });
+
+      const a = document.createElement("a");
+      const safeName = String(project?.name || "teklif").replace(/[\\/:*?"<>|]/g, "-");
+      a.download = `${safeName}-${code}.jpg`;
+      a.href = dataUrl;
+      a.click();
+    } catch (e) {
+      alert("JPG kaydı başarısız. İnternet erişimi var mı kontrol et (esm.sh).");
+      console.error(e);
+    }
+  }
+
   // ---------- STYLES ----------
   const S = {
     page: { minHeight: "100vh", background: "#f6f7fb", color: "#0f172a", padding: 16 },
@@ -339,26 +363,26 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     setDraftType(t);
     setDraftName("");
 
-    // Default draft data
+    // ✅ Cursor kaçmasın diye sayıları STRING tutuyoruz.
     if (t === "Mutfak") {
       setDraftData({
         shape: "Duz",
-        totalWallCm: 600,
-        wallAcm: 400,
-        wallBcm: 500,
-        wallCcm: 300,
-        ceilingCm: 260,
-        fridgeCm: 90,
-        tallOvenCm: 60,
-        islandCm: 0,
+        totalWallCm: "600",
+        wallAcm: "400",
+        wallBcm: "500",
+        wallCcm: "300",
+        ceilingCm: "260",
+        fridgeCm: "90",
+        tallOvenCm: "60",
+        islandCm: "0",
         upperMode: "IkiKat",
         material: "Lake",
       });
     } else if (t === "Kahve Köşesi") {
       setDraftData({
-        runAltCm: 120,
-        ceilingCm: 260,
-        tallTotalCm: 0,
+        runAltCm: "120",
+        ceilingCm: "260",
+        tallTotalCm: "0",
         hasUpper: true,
         hasBazali: false,
         material: "Lake",
@@ -368,24 +392,24 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         tip: "Tip1",
         size: "80",
         mirrorCabinet: false,
-        wmW: 60,
-        wmH: 200,
-        wmD: 60,
-        panW: 45,
-        panH: 200,
-        panD: 60,
+        wmW: "60",
+        wmH: "200",
+        wmD: "60",
+        panW: "45",
+        panH: "200",
+        panD: "60",
         material: "Lake",
       });
     } else if (t === "Seperatör") {
-      setDraftData({ w: 100, h: 250, d: 10, material: "Lake" });
+      setDraftData({ w: "100", h: "250", d: "10", material: "Lake" });
     } else if (t === "TV Ünitesi") {
-      setDraftData({ w: 300, h: 250, d: 40, material: "Lake" });
+      setDraftData({ w: "300", h: "250", d: "40", material: "Lake" });
     } else if (t === "Kapı") {
-      setDraftData({ qty: 1 });
+      setDraftData({ qty: "1" });
     } else if (t === "Süpürgelik") {
-      setDraftData({ m: 10 });
+      setDraftData({ m: "10" });
     } else {
-      setDraftData({ w: 100, h: 100, d: 60, material: "Lake" });
+      setDraftData({ w: "100", h: "100", d: "60", material: "Lake" });
     }
   }
 
@@ -395,7 +419,6 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   }
   function closeDrawerNoSave() {
     setDrawerOpen(false);
-    // draftState kalır ama projeye yazılmaz => değişiklik yok
   }
 
   // ---------- SAVE DRAFT => ADD ITEM ----------
@@ -445,6 +468,8 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     const t = draftType;
     const d = draftData;
 
+    const setStr = (key) => (e) => setDraftData((x) => ({ ...x, [key]: e.target.value }));
+
     return (
       <div style={{ display: "grid", gap: 10 }}>
         <div>
@@ -467,14 +492,14 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               </div>
               <div>
                 <div style={S.mini}>Tavan (cm)</div>
-                <input style={S.input} value={String(d.ceilingCm ?? 260)} onChange={(e) => setDraftData((x) => ({ ...x, ceilingCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.ceilingCm ?? "260")} onChange={setStr("ceilingCm")} />
               </div>
             </div>
 
             {String(d.shape || "Duz") === "Duz" && (
               <div>
                 <div style={S.mini}>Toplam duvar (cm)</div>
-                <input style={S.input} value={String(d.totalWallCm ?? 600)} onChange={(e) => setDraftData((x) => ({ ...x, totalWallCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.totalWallCm ?? "600")} onChange={setStr("totalWallCm")} />
               </div>
             )}
 
@@ -482,20 +507,15 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={S.grid3}>
                 <div>
                   <div style={S.mini}>Duvar A (cm)</div>
-                  <input style={S.input} value={String(d.wallAcm ?? 400)} onChange={(e) => setDraftData((x) => ({ ...x, wallAcm: toNum(e.target.value) }))} />
+                  <input style={S.input} value={String(d.wallAcm ?? "400")} onChange={setStr("wallAcm")} />
                 </div>
                 <div>
                   <div style={S.mini}>Duvar B (cm)</div>
-                  <input style={S.input} value={String(d.wallBcm ?? 500)} onChange={(e) => setDraftData((x) => ({ ...x, wallBcm: toNum(e.target.value) }))} />
+                  <input style={S.input} value={String(d.wallBcm ?? "500")} onChange={setStr("wallBcm")} />
                 </div>
                 <div>
                   <div style={S.mini}>Duvar C (cm)</div>
-                  <input
-                    style={S.input}
-                    value={String(d.wallCcm ?? 300)}
-                    onChange={(e) => setDraftData((x) => ({ ...x, wallCcm: toNum(e.target.value) }))}
-                    disabled={String(d.shape || "Duz") !== "U"}
-                  />
+                  <input style={S.input} value={String(d.wallCcm ?? "300")} onChange={setStr("wallCcm")} disabled={String(d.shape || "Duz") !== "U"} />
                 </div>
               </div>
             )}
@@ -503,15 +523,15 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             <div style={S.grid3}>
               <div>
                 <div style={S.mini}>Buzdolabı (cm)</div>
-                <input style={S.input} value={String(d.fridgeCm ?? 90)} onChange={(e) => setDraftData((x) => ({ ...x, fridgeCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.fridgeCm ?? "90")} onChange={setStr("fridgeCm")} />
               </div>
               <div>
                 <div style={S.mini}>Boy ankastre (cm)</div>
-                <input style={S.input} value={String(d.tallOvenCm ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, tallOvenCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.tallOvenCm ?? "60")} onChange={setStr("tallOvenCm")} />
               </div>
               <div>
                 <div style={S.mini}>Ada (cm)</div>
-                <input style={S.input} value={String(d.islandCm ?? 0)} onChange={(e) => setDraftData((x) => ({ ...x, islandCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.islandCm ?? "0")} onChange={setStr("islandCm")} />
               </div>
             </div>
 
@@ -531,18 +551,18 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             <div style={S.grid2}>
               <div>
                 <div style={S.mini}>Alt dolap eni (cm)</div>
-                <input style={S.input} value={String(d.runAltCm ?? 120)} onChange={(e) => setDraftData((x) => ({ ...x, runAltCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.runAltCm ?? "120")} onChange={setStr("runAltCm")} />
               </div>
               <div>
                 <div style={S.mini}>Tavan (cm)</div>
-                <input style={S.input} value={String(d.ceilingCm ?? 260)} onChange={(e) => setDraftData((x) => ({ ...x, ceilingCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.ceilingCm ?? "260")} onChange={setStr("ceilingCm")} />
               </div>
             </div>
 
             <div style={S.grid2}>
               <div>
                 <div style={S.mini}>Boy dolap toplam eni (cm)</div>
-                <input style={S.input} value={String(d.tallTotalCm ?? 0)} onChange={(e) => setDraftData((x) => ({ ...x, tallTotalCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={String(d.tallTotalCm ?? "0")} onChange={setStr("tallTotalCm")} />
               </div>
               <div>
                 <div style={S.mini}>Üst dolap</div>
@@ -597,16 +617,16 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <>
                 <div style={S.mini}>Çamaşır kabini (cm)</div>
                 <div style={S.grid3}>
-                  <input style={S.input} value={String(d.wmW ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, wmW: toNum(e.target.value) }))} placeholder="En" />
-                  <input style={S.input} value={String(d.wmH ?? 200)} onChange={(e) => setDraftData((x) => ({ ...x, wmH: toNum(e.target.value) }))} placeholder="Boy" />
-                  <input style={S.input} value={String(d.wmD ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, wmD: toNum(e.target.value) }))} placeholder="Derinlik" />
+                  <input style={S.input} value={String(d.wmW ?? "60")} onChange={setStr("wmW")} placeholder="En" />
+                  <input style={S.input} value={String(d.wmH ?? "200")} onChange={setStr("wmH")} placeholder="Boy" />
+                  <input style={S.input} value={String(d.wmD ?? "60")} onChange={setStr("wmD")} placeholder="Derinlik" />
                 </div>
 
                 <div style={S.mini}>Kiler dolabı (cm)</div>
                 <div style={S.grid3}>
-                  <input style={S.input} value={String(d.panW ?? 45)} onChange={(e) => setDraftData((x) => ({ ...x, panW: toNum(e.target.value) }))} placeholder="En" />
-                  <input style={S.input} value={String(d.panH ?? 200)} onChange={(e) => setDraftData((x) => ({ ...x, panH: toNum(e.target.value) }))} placeholder="Boy" />
-                  <input style={S.input} value={String(d.panD ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, panD: toNum(e.target.value) }))} placeholder="Derinlik" />
+                  <input style={S.input} value={String(d.panW ?? "45")} onChange={setStr("panW")} placeholder="En" />
+                  <input style={S.input} value={String(d.panH ?? "200")} onChange={setStr("panH")} placeholder="Boy" />
+                  <input style={S.input} value={String(d.panD ?? "60")} onChange={setStr("panD")} placeholder="Derinlik" />
                 </div>
               </>
             )}
@@ -617,9 +637,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <>
             <div style={S.mini}>Ölçüler (cm)</div>
             <div style={S.grid3}>
-              <input style={S.input} value={String(d.w ?? 300)} onChange={(e) => setDraftData((x) => ({ ...x, w: toNum(e.target.value) }))} placeholder="En" />
-              <input style={S.input} value={String(d.h ?? 250)} onChange={(e) => setDraftData((x) => ({ ...x, h: toNum(e.target.value) }))} placeholder="Boy" />
-              <input style={S.input} value={String(d.d ?? 40)} onChange={(e) => setDraftData((x) => ({ ...x, d: toNum(e.target.value) }))} placeholder="Derinlik" />
+              <input style={S.input} value={String(d.w ?? "300")} onChange={setStr("w")} placeholder="En" />
+              <input style={S.input} value={String(d.h ?? "250")} onChange={setStr("h")} placeholder="Boy" />
+              <input style={S.input} value={String(d.d ?? "40")} onChange={setStr("d")} placeholder="Derinlik" />
             </div>
           </>
         )}
@@ -628,9 +648,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <>
             <div style={S.mini}>Ölçüler (cm)</div>
             <div style={S.grid3}>
-              <input style={S.input} value={String(d.w ?? 100)} onChange={(e) => setDraftData((x) => ({ ...x, w: toNum(e.target.value) }))} placeholder="En" />
-              <input style={S.input} value={String(d.h ?? 250)} onChange={(e) => setDraftData((x) => ({ ...x, h: toNum(e.target.value) }))} placeholder="Boy" />
-              <input style={S.input} value={String(d.d ?? 10)} onChange={(e) => setDraftData((x) => ({ ...x, d: toNum(e.target.value) }))} placeholder="Derinlik" />
+              <input style={S.input} value={String(d.w ?? "100")} onChange={setStr("w")} placeholder="En" />
+              <input style={S.input} value={String(d.h ?? "250")} onChange={setStr("h")} placeholder="Boy" />
+              <input style={S.input} value={String(d.d ?? "10")} onChange={setStr("d")} placeholder="Derinlik" />
             </div>
           </>
         )}
@@ -638,7 +658,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         {t === "Kapı" && (
           <>
             <div style={S.mini}>Adet</div>
-            <input style={S.input} value={String(d.qty ?? 1)} onChange={(e) => setDraftData((x) => ({ ...x, qty: Math.max(0, Math.floor(toNum(e.target.value))) }))} />
+            <input style={S.input} value={String(d.qty ?? "1")} onChange={setStr("qty")} />
             <div style={S.mini}>Detay: Lake</div>
           </>
         )}
@@ -646,7 +666,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         {t === "Süpürgelik" && (
           <>
             <div style={S.mini}>Metre</div>
-            <input style={S.input} value={String(d.m ?? 10)} onChange={(e) => setDraftData((x) => ({ ...x, m: Math.max(0, toNum(e.target.value)) }))} />
+            <input style={S.input} value={String(d.m ?? "10")} onChange={setStr("m")} />
             <div style={S.mini}>Detay: Lake</div>
           </>
         )}
@@ -655,9 +675,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <>
             <div style={S.mini}>Ölçüler (cm)</div>
             <div style={S.grid3}>
-              <input style={S.input} value={String(d.w ?? 100)} onChange={(e) => setDraftData((x) => ({ ...x, w: toNum(e.target.value) }))} placeholder="En" />
-              <input style={S.input} value={String(d.h ?? 100)} onChange={(e) => setDraftData((x) => ({ ...x, h: toNum(e.target.value) }))} placeholder="Boy" />
-              <input style={S.input} value={String(d.d ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, d: toNum(e.target.value) }))} placeholder="Derinlik" />
+              <input style={S.input} value={String(d.w ?? "100")} onChange={setStr("w")} placeholder="En" />
+              <input style={S.input} value={String(d.h ?? "100")} onChange={setStr("h")} placeholder="Boy" />
+              <input style={S.input} value={String(d.d ?? "60")} onChange={setStr("d")} placeholder="Derinlik" />
             </div>
           </>
         )}
@@ -674,7 +694,11 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             </div>
           </div>
           <div style={S.mini}>
-            {draftType === "Kapı" ? "Malzeme: Lake" : draftType === "Süpürgelik" ? "Malzeme: Lake" : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
+            {draftType === "Kapı"
+              ? "Malzeme: Lake"
+              : draftType === "Süpürgelik"
+              ? "Malzeme: Lake"
+              : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
           </div>
         </div>
       </div>
@@ -738,7 +762,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   function OfferView() {
     const company = settings.companyInfo || {};
     return (
-      <div style={S.card}>
+      <div ref={offerRef} style={S.card}>
         <div style={S.cardBody}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
             <div style={{ whiteSpace: "pre-line" }}>
@@ -747,8 +771,12 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={S.mini}>{company.phone || ""}</div>
               <div style={S.mini}>{company.email || ""}</div>
             </div>
+
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontWeight: 950 }}>TEKLİF</div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                <button style={S.btn} onClick={downloadOfferJpg}>JPG Kaydet</button>
+              </div>
+              <div style={{ fontWeight: 950, marginTop: 8 }}>TEKLİF</div>
               <div style={S.mini}>Tarih: {formatDate(offerDate)}</div>
               <div style={S.mini}>Kod: {code}</div>
             </div>
@@ -803,13 +831,19 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={S.mini}>Genel Toplam</div>
               <div style={{ fontWeight: 950, fontSize: 18 }}>{currency(grandTotal)}</div>
             </div>
+
+            {/* ✅ İstenen notlar */}
+            <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
+              <div style={S.mini}>* Fiyatlara KDV dahil değildir.</div>
+              <div style={S.mini}>* Termin/montaj süresi teklif onaylandığı andan itibaren 60 gündür.</div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // ---------- RENDER (Sade Kalemler Sekmesi) ----------
+  // ---------- RENDER ----------
   return (
     <div style={S.page}>
       <div style={S.container}>
