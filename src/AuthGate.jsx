@@ -1,88 +1,316 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./core/supabaseClient";
-import { Button, Card, Input } from "./ui/ui";
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
-  const [mode, setMode] = useState("login"); // login | signup
+  const [mode, setMode] = useState("password"); // "password" | "magic"
   const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [msg, setMsg] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState({ type: "", text: "" });
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session || null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
+    let alive = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      setSession(data?.session || null);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess || null);
+    });
+
+    return () => {
+      alive = false;
+      sub?.subscription?.unsubscribe?.();
+    };
   }, []);
 
-  async function doLogin() {
-    setMsg("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (error) setMsg(error.message);
+  const canSubmit = useMemo(() => {
+    if (!email.trim()) return false;
+    if (mode === "password") return password.length >= 6;
+    return true;
+  }, [email, password, mode]);
+
+  async function signInWithPassword() {
+    setBusy(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setMsg({
+          type: "error",
+          text:
+            error.message === "Invalid login credentials"
+              ? "Email/şifre hatalı ya da bu kullanıcıda şifre hiç set edilmemiş olabilir. Supabase’den 'Reset password' ile yeni şifre belirle."
+              : error.message,
+        });
+        return;
+      }
+    } catch {
+      setMsg({ type: "error", text: "Bağlantı hatası. Supabase URL/Key doğru mu?" });
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function doSignup() {
-    setMsg("");
-    const { error } = await supabase.auth.signUp({ email, password: pass });
-    if (error) setMsg(error.message);
-    else setMsg("Kayıt alındı. Mail doğrulaması kapalıysa direkt giriş olur; açıksa mailini doğrula.");
+  async function sendMagicLink() {
+    setBusy(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) {
+        setMsg({ type: "error", text: error.message });
+        return;
+      }
+      setMsg({ type: "ok", text: "Magic link gönderildi. Mailden linke tıkla ✅" });
+    } catch {
+      setMsg({ type: "error", text: "Bağlantı hatası. Supabase URL/Key doğru mu?" });
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function doLogout() {
-    await supabase.auth.signOut();
+  async function signUp() {
+    setBusy(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setMsg({ type: "error", text: error.message });
+        return;
+      }
+      setMsg({
+        type: "ok",
+        text: "Kayıt başarılı ✅ (Mail doğrulama açıksa mailine doğrulama gelir.)",
+      });
+    } catch {
+      setMsg({ type: "error", text: "Bağlantı hatası. Supabase URL/Key doğru mu?" });
+    } finally {
+      setBusy(false);
+    }
   }
 
+  async function signOut() {
+    try {
+      await supabase.auth.signOut();
+      // onAuthStateChange zaten session'ı null yapacak → login ekranı gelecek
+    } catch {
+      // çok gerek yok ama sessiz geçelim
+    }
+  }
+
+  // ✅ Login olduysa: app + sağ altta çıkış butonu
   if (session) {
     return (
-      <div>
-        <div className="max-w-5xl mx-auto px-4 pt-4">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-white/50 truncate">Giriş: {session.user.email}</div>
-            <Button variant="ghost" onClick={doLogout}>
-              Çıkış
-            </Button>
-          </div>
-        </div>
+      <>
         {children}
-      </div>
+
+        {/* Mini Çıkış Butonu */}
+        <button
+          onClick={signOut}
+          style={{
+            position: "fixed",
+            right: 14,
+            bottom: 14,
+            zIndex: 9999,
+            padding: "10px 12px",
+            borderRadius: 14,
+            border: "1px solid rgba(0,0,0,0.12)",
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 14px 40px rgba(0,0,0,0.15)",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+          title="Çıkış yap"
+        >
+          Çıkış
+        </button>
+      </>
     );
   }
 
+  // Login değilse: Login UI
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-2xl font-black mb-3">Lavera Teklif</div>
-        <Card>
-          <div className="p-4 space-y-3">
-            <div className="flex gap-2">
-              <Button variant={mode === "login" ? "primary" : "ghost"} onClick={() => setMode("login")}>
-                Giriş
-              </Button>
-              <Button variant={mode === "signup" ? "primary" : "ghost"} onClick={() => setMode("signup")}>
-                Kayıt
-              </Button>
-            </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0b1220",
+        display: "grid",
+        placeItems: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          borderRadius: 22,
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+          padding: 18,
+          color: "#fff",
+        }}
+      >
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>Lavera Teklif</div>
+        <div style={{ opacity: 0.75, fontSize: 12, marginBottom: 14 }}>
+          Email + şifre ya da magic link ile giriş.
+        </div>
 
-            <Input label="Email" value={email} onChange={setEmail} placeholder="mail@..." type="email" />
-            <Input label="Şifre" value={pass} onChange={setPass} placeholder="••••••••" type="password" />
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={() => setMode("password")}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: mode === "password" ? "#ffffff" : "rgba(255,255,255,0.06)",
+              color: mode === "password" ? "#0b1220" : "#fff",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Email + Şifre
+          </button>
+          <button
+            onClick={() => setMode("magic")}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: mode === "magic" ? "#ffffff" : "rgba(255,255,255,0.06)",
+              color: mode === "magic" ? "#0b1220" : "#fff",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Magic Link
+          </button>
+        </div>
 
-            {msg ? <div className="text-sm text-red-300">{msg}</div> : null}
+        <label style={{ display: "block", fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Email</label>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="ornek@mail.com"
+          style={{
+            width: "100%",
+            padding: 12,
+            borderRadius: 14,
+            border: "1px solid rgba(255,255,255,0.14)",
+            background: "rgba(0,0,0,0.20)",
+            color: "#fff",
+            outline: "none",
+            marginBottom: 10,
+          }}
+        />
 
-            {mode === "login" ? (
-              <Button onClick={doLogin} disabled={!email || !pass}>
-                Giriş Yap
-              </Button>
-            ) : (
-              <Button onClick={doSignup} disabled={!email || !pass}>
-                Kayıt Ol
-              </Button>
-            )}
+        {mode === "password" && (
+          <>
+            <label style={{ display: "block", fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Şifre</label>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="******"
+              type="password"
+              style={{
+                width: "100%",
+                padding: 12,
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.20)",
+                color: "#fff",
+                outline: "none",
+                marginBottom: 12,
+              }}
+            />
+          </>
+        )}
 
-            <div className="text-xs text-white/40">
-              Not: Supabase Authentication → Providers → Email açık olmalı.
-            </div>
+        {msg.text && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 10,
+              borderRadius: 14,
+              background: msg.type === "error" ? "rgba(255,80,80,0.18)" : "rgba(80,255,140,0.16)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              fontSize: 12,
+              lineHeight: 1.35,
+            }}
+          >
+            {msg.text}
           </div>
-        </Card>
+        )}
+
+        {mode === "password" ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            <button
+              disabled={!canSubmit || busy}
+              onClick={signInWithPassword}
+              style={{
+                width: "100%",
+                padding: 12,
+                borderRadius: 14,
+                border: 0,
+                background: canSubmit ? "#ffffff" : "rgba(255,255,255,0.20)",
+                color: "#0b1220",
+                fontWeight: 900,
+                cursor: canSubmit ? "pointer" : "not-allowed",
+              }}
+            >
+              {busy ? "Giriş yapılıyor..." : "Giriş Yap"}
+            </button>
+            <button
+              disabled={!canSubmit || busy}
+              onClick={signUp}
+              style={{
+                width: "100%",
+                padding: 12,
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.16)",
+                background: "rgba(255,255,255,0.06)",
+                color: "#fff",
+                fontWeight: 900,
+                cursor: canSubmit ? "pointer" : "not-allowed",
+              }}
+            >
+              {busy ? "..." : "Kayıt Ol"}
+            </button>
+          </div>
+        ) : (
+          <button
+            disabled={!canSubmit || busy}
+            onClick={sendMagicLink}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 14,
+              border: 0,
+              background: canSubmit ? "#ffffff" : "rgba(255,255,255,0.20)",
+              color: "#0b1220",
+              fontWeight: 900,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+            }}
+          >
+            {busy ? "Gönderiliyor..." : "Magic Link Gönder"}
+          </button>
+        )}
       </div>
     </div>
   );
