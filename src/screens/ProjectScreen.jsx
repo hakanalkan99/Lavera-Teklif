@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState , useCallback } from "react";
 import html2canvas from "html2canvas";
 
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
@@ -444,7 +444,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     return (e) => setDraftData((x) => ({ ...x, [key]: e.target.value }));
   }
 
-  function DraftForm() {
+  const DraftForm = React.memo(function DraftForm() {
     const t = draftType;
     const d = draftData;
 
@@ -686,7 +686,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         </div>
       </div>
     );
-  }
+  });
 
   function Drawer() {
     if (!drawerOpen) return null;
