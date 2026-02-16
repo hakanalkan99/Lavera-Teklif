@@ -747,70 +747,6 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     });
   }
 
-  function Drawer() {
-    if (!drawerOpen) return null;
-
-    return (
-      <>
-        <div style={S.drawerBack} onClick={closeDrawerNoSave} />
-        <div style={S.drawer}>
-          <div style={S.drawerHead}>
-            <div>
-              <div style={{ fontWeight: 950 }}>Kalem Ekle</div>
-              <div style={S.mini}>{draftType}</div>
-            </div>
-            <button style={S.btn} onClick={closeDrawerNoSave}>
-              Kapat
-            </button>
-          </div>
-
-          <div style={S.drawerBody}>
-            <div style={{ display: "grid", gap: 10 }}>
-              <div>
-                <div style={S.mini}>Kalem Türü</div>
-                <select
-                  style={S.select}
-                  value={draftType}
-                  onChange={(e) => initDraft(e.target.value)}
-                >
-                  {itemTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <DraftForm
-                S={S}
-                draftType={draftType}
-                draftName={draftName}
-                setDraftName={setDraftName}
-                draftData={draftData}
-                setDraftData={setDraftData}
-                itemTypes={itemTypes}
-                normalizeType={normalizeType}
-                materialLabel={materialLabel}
-                computeItem={computeItem}
-                roundUpThousands={roundUpThousands}
-                currency={currency}
-              />
-            </div>
-          </div>
-
-          <div style={S.drawerFoot}>
-            <button style={S.btn} onClick={closeDrawerNoSave}>
-              İptal
-            </button>
-            <button style={S.btnPrimary} onClick={saveDraftAsItem}>
-              Kaydet
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   // ---------- OFFER VIEW (seninki aynı kalsın diye dokunmadım) ----------
   function OfferView() {
     const company = settings.companyInfo || {};
@@ -1154,9 +1090,53 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               </div>
             )}
 
-            <Drawer />
-          </>
-        )}
+            {drawerOpen && (
+  <>
+    <div style={S.drawerBack} onClick={closeDrawerNoSave} />
+    <div style={S.drawer}>
+      <div style={S.drawerHead}>
+        <div>
+          <div style={{ fontWeight: 950 }}>Kalem Ekle</div>
+          <div style={S.mini}>{draftType}</div>
+        </div>
+        <button style={S.btn} onClick={closeDrawerNoSave}>
+          Kapat
+        </button>
+      </div>
+
+      <div style={S.drawerBody}>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <div style={S.mini}>Kalem Türü</div>
+            <select
+              style={S.select}
+              value={draftType}
+              onChange={(e) => initDraft(e.target.value)}
+            >
+              {itemTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* DraftForm sende hangi versiyonsa aynen kalsın */}
+          <DraftForm />
+        </div>
+      </div>
+
+      <div style={S.drawerFoot}>
+        <button style={S.btn} onClick={closeDrawerNoSave}>
+          İptal
+        </button>
+        <button style={S.btnPrimary} onClick={saveDraftAsItem}>
+          Kaydet
+        </button>
+      </div>
+    </div>
+  </>
+)}
 
         {tab === "aksesuarlar" && (
           <>
