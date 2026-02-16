@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState , useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import html2canvas from "html2canvas";
 
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
@@ -197,7 +197,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     const mirrorCabinet = data.mirrorCabinet === true;
 
     let base = 1.5; // 80
-    if (size === "60") base = 1.0; // 80'in 0.5 eksiği
+    if (size === "60") base = 1.0;
     if (size === "100") base = 2.0;
     if (size === "120") base = 2.5;
 
@@ -258,7 +258,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     return calcSimplePrice(data);
   }
 
-  // ---------- ITEMS COMPUTED (for summaries & offer) ----------
+  // ---------- ITEMS COMPUTED ----------
   const itemsComputed = useMemo(() => {
     return (project?.items || []).map((it) => {
       const r = computeItem(it);
@@ -336,7 +336,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   // ---------- DRAWER OPEN/CLOSE ----------
   const itemTypes = ["Mutfak", "Kahve Köşesi", "Hilton", "Sade Kalem", "Seperatör", "TV Ünitesi", "Kapı", "Süpürgelik"];
 
-  // ✅ FIX: sayısal alanları STRING tutuyoruz (cursor/focus bozulmaz)
+  // ✅ sayısal alanları STRING tutuyoruz (cursor/focus bozulmaz)
   function initDraft(type) {
     const t = normalizeType(type);
     setDraftType(t);
@@ -424,24 +424,25 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     });
   }
 
-function renderDraftMaterialPicker() {
-  if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
-  return (
-    <div>
-      <div style={S.mini}>Malzeme</div>
-      <select
-        style={S.select}
-        value={draftData.material || "Lake"}
-        onChange={(e) => setDraftData((x) => ({ ...x, material: e.target.value }))}
-      >
-        <option value="MDFLAM">MDFLAM</option>
-        <option value="HGloss">High Gloss</option>
-        <option value="LakPanel">Lak Panel</option>
-        <option value="Lake">Lake</option>
-      </select>
-    </div>
-  );
-}
+  // ✅ FIX: doğru isim + component gibi kullan
+  function DraftMaterialPicker() {
+    if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
+    return (
+      <div>
+        <div style={S.mini}>Malzeme</div>
+        <select
+          style={S.select}
+          value={draftData.material || "Lake"}
+          onChange={(e) => setDraftData((x) => ({ ...x, material: e.target.value }))}
+        >
+          <option value="MDFLAM">MDFLAM</option>
+          <option value="HGloss">High Gloss</option>
+          <option value="LakPanel">Lak Panel</option>
+          <option value="Lake">Lake</option>
+        </select>
+      </div>
+    );
+  }
 
   // ✅ FIX helper: input -> string update (cursor bozulmasın)
   function setDraftField(key) {
@@ -459,7 +460,8 @@ function renderDraftMaterialPicker() {
           <input style={S.input} value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={draftType} />
         </div>
 
-        {DraftMaterialPicker()}
+        {/* ✅ FIX: function çağırma değil, component */}
+        <DraftMaterialPicker />
 
         {t === "Mutfak" && (
           <>
@@ -497,12 +499,7 @@ function renderDraftMaterialPicker() {
                 </div>
                 <div>
                   <div style={S.mini}>Duvar C (cm)</div>
-                  <input
-                    style={S.input}
-                    value={d.wallCcm ?? ""}
-                    onChange={setDraftField("wallCcm")}
-                    disabled={String(d.shape || "Duz") !== "U"}
-                  />
+                  <input style={S.input} value={d.wallCcm ?? ""} onChange={setDraftField("wallCcm")} disabled={String(d.shape || "Duz") !== "U"} />
                 </div>
               </div>
             )}
@@ -745,12 +742,11 @@ function renderDraftMaterialPicker() {
     );
   }
 
-  // ---------- OFFER VIEW (A4'e OTOMATİK SIĞDIR + LOGO + DİPNOT + İMZA) ----------
+  // ---------- OFFER VIEW ----------
   function OfferView() {
     const company = settings.companyInfo || {};
     const logoUrl = company.logoDataUrl || "";
 
-    // A4 px (yaklaşık)
     const A4_W = 794;
     const A4_H = 1123;
 
@@ -759,25 +755,14 @@ function renderDraftMaterialPicker() {
     const [fitScale, setFitScale] = useState(1);
     const [exporting, setExporting] = useState(false);
 
-    // İçerik ne kadar uzunsa A4 içine sığacak şekilde küçült
     useLayoutEffect(() => {
       const el = contentRef.current;
       if (!el) return;
-
       const h = el.scrollHeight || el.getBoundingClientRect().height || 0;
       if (!h) return;
-
       const s = Math.min(1, A4_H / h);
-      // çok uzun listede bile okunur kalsın:
       setFitScale(Math.max(0.78, s));
-    }, [
-      itemsComputed.length,
-      (project?.accessories || []).length,
-      company.logoDataUrl,
-      project?.customerName,
-      project?.phone,
-      project?.address,
-    ]);
+    }, [itemsComputed.length, (project?.accessories || []).length, company.logoDataUrl, project?.customerName, project?.phone, project?.address]);
 
     async function exportJpg() {
       try {
@@ -789,7 +774,7 @@ function renderDraftMaterialPicker() {
 
         const canvas = await html2canvas(node, {
           backgroundColor: "#ffffff",
-          scale: 3, // kalite ↑
+          scale: 3,
           useCORS: true,
         });
 
@@ -804,33 +789,10 @@ function renderDraftMaterialPicker() {
     }
 
     const ST = {
-      shell: {
-        width: A4_W,
-        minHeight: A4_H,
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 18,
-        boxShadow: "0 14px 45px rgba(0,0,0,0.08)",
-        overflow: "hidden",
-      },
+      shell: { width: A4_W, minHeight: A4_H, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, boxShadow: "0 14px 45px rgba(0,0,0,0.08)", overflow: "hidden" },
       pad: { padding: 20 },
-      headerGrid: {
-        display: "grid",
-        gridTemplateColumns: "1.2fr 1.1fr 0.9fr",
-        gap: 14,
-        alignItems: "start",
-      },
-      logoBox: {
-        width: 120,
-        height: 56,
-        borderRadius: 12,
-        border: "1px solid #eef0f4",
-        background: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-      },
+      headerGrid: { display: "grid", gridTemplateColumns: "1.2fr 1.1fr 0.9fr", gap: 14, alignItems: "start" },
+      logoBox: { width: 120, height: 56, borderRadius: 12, border: "1px solid #eef0f4", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" },
       logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
 
       companyName: { fontWeight: 950, fontSize: 13, color: "#0f172a" },
@@ -861,14 +823,7 @@ function renderDraftMaterialPicker() {
       signBox: { border: "1px dashed #cbd5e1", borderRadius: 14, padding: 12, minHeight: 70 },
       signTitle: { fontSize: 10.6, fontWeight: 900, color: "#334155" },
       actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end" },
-      exportBtn: {
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: "1px solid #e5e7eb",
-        background: "#fff",
-        fontWeight: 900,
-        cursor: "pointer",
-      },
+      exportBtn: { padding: "10px 12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "#fff", fontWeight: 900, cursor: "pointer" },
     };
 
     return (
@@ -881,18 +836,13 @@ function renderDraftMaterialPicker() {
                 ...ST.pad,
                 transform: `scale(${fitScale})`,
                 transformOrigin: "top left",
-                width: A4_W / fitScale, // scale sonrası taşma olmasın
+                width: A4_W / fitScale,
               }}
             >
-              {/* HEADER: logo + proje/müşteri (logo ile hizalı) + teklif meta */}
               <div style={ST.headerGrid}>
                 <div>
                   <div style={ST.logoBox}>
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="logo" style={ST.logoImg} />
-                    ) : (
-                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>
-                    )}
+                    {logoUrl ? <img src={logoUrl} alt="logo" style={ST.logoImg} /> : <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>}
                   </div>
                   <div style={{ marginTop: 8 }}>
                     <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
@@ -923,7 +873,6 @@ function renderDraftMaterialPicker() {
 
               <div style={ST.divider} />
 
-              {/* TABLE */}
               <div style={ST.tableWrap}>
                 <div style={ST.head}>
                   <div style={ST.th}>Kalem / Detay</div>
@@ -953,7 +902,6 @@ function renderDraftMaterialPicker() {
                   );
                 })}
 
-                {/* Aksesuar satırı */}
                 {project.accessories?.length > 0 && (
                   <div style={ST.row}>
                     <div style={ST.td}>
@@ -974,7 +922,6 @@ function renderDraftMaterialPicker() {
                 )}
               </div>
 
-              {/* TOTALS */}
               <div style={ST.totals}>
                 <div style={ST.totalRow}>
                   <div>Kalemler Toplamı</div>
@@ -990,7 +937,6 @@ function renderDraftMaterialPicker() {
                 </div>
               </div>
 
-              {/* FOOTER */}
               <div style={ST.footerGrid}>
                 <div style={ST.notes}>
                   {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
@@ -1005,7 +951,6 @@ function renderDraftMaterialPicker() {
           </div>
         </div>
 
-        {/* export butonu (export sırasında gizlenir) */}
         <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
           <button style={ST.exportBtn} onClick={exportJpg}>
             JPEG Çıktı Al
