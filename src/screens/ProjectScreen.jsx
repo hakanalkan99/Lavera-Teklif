@@ -1,15 +1,13 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 
-/* =========================================================
-   ✅ FIX: Draft form componentleri DIŞARIDA tanımlı
-   (ProjectScreen her setState’te re-render olsa bile
-    DraftForm component referansı değişmez => focus kaçmaz)
-   ========================================================= */
+/* ---------------------------
+   ✅ STABLE COMPONENTS (OUTSIDE)
+   Bu sayede her tuşta remount olmaz, focus düşmez.
+--------------------------- */
 
-function DraftMaterialPicker({ draftType, draftData, setDraftData, S }) {
+const DraftMaterialPicker = React.memo(function DraftMaterialPicker({ S, draftType, draftData, setDraftData }) {
   if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
-
   return (
     <div>
       <div style={S.mini}>Malzeme</div>
@@ -25,28 +23,29 @@ function DraftMaterialPicker({ draftType, draftData, setDraftData, S }) {
       </select>
     </div>
   );
-}
+});
 
-function DraftFormUI({
+const DraftForm = React.memo(function DraftForm({
+  S,
   draftType,
   draftName,
   setDraftName,
   draftData,
   setDraftData,
-  S,
+  itemTypes,
+  normalizeType,
   materialLabel,
   computeItem,
   roundUpThousands,
   currency,
-  normalizeType,
 }) {
-  const d = draftData;
+  // ✅ cursor/focus bozulmasın diye inputlar string yazar, hesapta toNum yapılır.
+  function setDraftField(key) {
+    return (e) => setDraftData((x) => ({ ...x, [key]: e.target.value }));
+  }
 
-  // inputlarda cursor/focus bozulmasın diye STRING yazıyoruz
-  const setDraftField = (key) => (e) => {
-    const v = e.target.value;
-    setDraftData((x) => ({ ...x, [key]: v }));
-  };
+  const t = draftType;
+  const d = draftData;
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
@@ -60,14 +59,9 @@ function DraftFormUI({
         />
       </div>
 
-      <DraftMaterialPicker
-        draftType={draftType}
-        draftData={draftData}
-        setDraftData={setDraftData}
-        S={S}
-      />
+      <DraftMaterialPicker S={S} draftType={draftType} draftData={draftData} setDraftData={setDraftData} />
 
-      {draftType === "Mutfak" && (
+      {t === "Mutfak" && (
         <>
           <div style={S.grid2}>
             <div>
@@ -147,7 +141,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "Kahve Köşesi" && (
+      {t === "Kahve Köşesi" && (
         <>
           <div style={S.grid2}>
             <div>
@@ -192,7 +186,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "Hilton" && (
+      {t === "Hilton" && (
         <>
           <div style={S.grid2}>
             <div>
@@ -254,7 +248,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "TV Ünitesi" && (
+      {t === "TV Ünitesi" && (
         <>
           <div style={S.mini}>Ölçüler (cm)</div>
           <div style={S.grid3}>
@@ -265,7 +259,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "Seperatör" && (
+      {t === "Seperatör" && (
         <>
           <div style={S.mini}>Ölçüler (cm)</div>
           <div style={S.grid3}>
@@ -276,7 +270,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "Kapı" && (
+      {t === "Kapı" && (
         <>
           <div style={S.mini}>Adet</div>
           <input style={S.input} value={d.qty ?? ""} onChange={setDraftField("qty")} />
@@ -284,7 +278,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "Süpürgelik" && (
+      {t === "Süpürgelik" && (
         <>
           <div style={S.mini}>Metre</div>
           <input style={S.input} value={d.m ?? ""} onChange={setDraftField("m")} />
@@ -292,7 +286,7 @@ function DraftFormUI({
         </>
       )}
 
-      {draftType === "Sade Kalem" && (
+      {t === "Sade Kalem" && (
         <>
           <div style={S.mini}>Ölçüler (cm)</div>
           <div style={S.grid3}>
@@ -324,11 +318,11 @@ function DraftFormUI({
       </div>
     </div>
   );
-}
+});
 
-/* =========================================================
-   ===================== ProjectScreen ======================
-   ========================================================= */
+/* ---------------------------
+   MAIN SCREEN
+--------------------------- */
 
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const project = state.projects.find((p) => p.id === projectId);
@@ -525,7 +519,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     const size = String(data.size || "80");
     const mirrorCabinet = data.mirrorCabinet === true;
 
-    let base = 1.5; // 80
+    let base = 1.5;
     if (size === "60") base = 1.0;
     if (size === "100") base = 2.0;
     if (size === "120") base = 2.5;
@@ -665,12 +659,12 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   // ---------- DRAWER OPEN/CLOSE ----------
   const itemTypes = ["Mutfak", "Kahve Köşesi", "Hilton", "Sade Kalem", "Seperatör", "TV Ünitesi", "Kapı", "Süpürgelik"];
 
-  // ✅ draftData sayısal alanlar STRING (cursor/focus stabil)
   function initDraft(type) {
     const t = normalizeType(type);
     setDraftType(t);
     setDraftName("");
 
+    // ✅ numeric fields as STRING
     if (t === "Mutfak") {
       setDraftData({
         shape: "Duz",
@@ -787,19 +781,19 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
                 </select>
               </div>
 
-              {/* ✅ FIX: DraftForm component artık stable */}
-              <DraftFormUI
+              <DraftForm
+                S={S}
                 draftType={draftType}
                 draftName={draftName}
                 setDraftName={setDraftName}
                 draftData={draftData}
                 setDraftData={setDraftData}
-                S={S}
+                itemTypes={itemTypes}
+                normalizeType={normalizeType}
                 materialLabel={materialLabel}
                 computeItem={computeItem}
                 roundUpThousands={roundUpThousands}
                 currency={currency}
-                normalizeType={normalizeType}
               />
             </div>
           </div>
@@ -817,7 +811,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     );
   }
 
-  // ---------- OFFER VIEW (A4'e OTOMATİK SIĞDIR + LOGO + DİPNOT + İMZA) ----------
+  // ---------- OFFER VIEW (seninki aynı kalsın diye dokunmadım) ----------
   function OfferView() {
     const company = settings.companyInfo || {};
     const logoUrl = company.logoDataUrl || "";
@@ -850,7 +844,6 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       try {
         setExporting(true);
         await new Promise((r) => setTimeout(r, 50));
-
         const node = sheetRef.current;
         if (!node) return;
 
@@ -954,11 +947,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={ST.headerGrid}>
                 <div>
                   <div style={ST.logoBox}>
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="logo" style={ST.logoImg} />
-                    ) : (
-                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>
-                    )}
+                    {logoUrl ? <img src={logoUrl} alt="logo" style={ST.logoImg} /> : <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>}
                   </div>
                   <div style={{ marginTop: 8 }}>
                     <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
@@ -997,25 +986,21 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
                 {itemsComputed.map((it) => {
                   const t = normalizeType(it.type);
-                  const dd = it.data || {};
+                  const d = it.data || {};
                   let detail = "";
 
                   if (t === "Kapı") detail = "Lake";
                   else if (t === "Süpürgelik") detail = "Lake";
-                  else if (dd.material) detail = materialLabel(dd.material);
+                  else if (d.material) detail = materialLabel(d.material);
 
-                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${dd.shape || "Düz"}`;
-                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${dd.tip || "Tip1"} • ${dd.size || "80"}`;
+                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
+                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
 
                   return (
                     <div key={it.id} style={ST.row}>
                       <div style={ST.td}>
                         <div style={{ fontWeight: 950, fontSize: 11.6 }}>{it.name}</div>
-                        {detail ? (
-                          <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>
-                            {detail}
-                          </div>
-                        ) : null}
+                        {detail ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>{detail}</div> : null}
                       </div>
                       <div style={ST.tdRight}>{currency(it._price || 0)}</div>
                     </div>
