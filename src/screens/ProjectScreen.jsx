@@ -336,6 +336,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   // ---------- DRAWER OPEN/CLOSE ----------
   const itemTypes = ["Mutfak", "Kahve Köşesi", "Hilton", "Sade Kalem", "Seperatör", "TV Ünitesi", "Kapı", "Süpürgelik"];
 
+  // ✅ FIX: sayısal alanları STRING tutuyoruz (cursor/focus bozulmaz)
   function initDraft(type) {
     const t = normalizeType(type);
     setDraftType(t);
@@ -344,22 +345,22 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     if (t === "Mutfak") {
       setDraftData({
         shape: "Duz",
-        totalWallCm: 600,
-        wallAcm: 400,
-        wallBcm: 500,
-        wallCcm: 300,
-        ceilingCm: 260,
-        fridgeCm: 90,
-        tallOvenCm: 60,
-        islandCm: 0,
+        totalWallCm: "600",
+        wallAcm: "400",
+        wallBcm: "500",
+        wallCcm: "300",
+        ceilingCm: "260",
+        fridgeCm: "90",
+        tallOvenCm: "60",
+        islandCm: "0",
         upperMode: "IkiKat",
         material: "Lake",
       });
     } else if (t === "Kahve Köşesi") {
       setDraftData({
-        runAltCm: 120,
-        ceilingCm: 260,
-        tallTotalCm: 0,
+        runAltCm: "120",
+        ceilingCm: "260",
+        tallTotalCm: "0",
         hasUpper: true,
         hasBazali: false,
         material: "Lake",
@@ -369,24 +370,24 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         tip: "Tip1",
         size: "80",
         mirrorCabinet: false,
-        wmW: 60,
-        wmH: 200,
-        wmD: 60,
-        panW: 45,
-        panH: 200,
-        panD: 60,
+        wmW: "60",
+        wmH: "200",
+        wmD: "60",
+        panW: "45",
+        panH: "200",
+        panD: "60",
         material: "Lake",
       });
     } else if (t === "Seperatör") {
-      setDraftData({ w: 100, h: 250, d: 10, material: "Lake" });
+      setDraftData({ w: "100", h: "250", d: "10", material: "Lake" });
     } else if (t === "TV Ünitesi") {
-      setDraftData({ w: 300, h: 250, d: 40, material: "Lake" });
+      setDraftData({ w: "300", h: "250", d: "40", material: "Lake" });
     } else if (t === "Kapı") {
-      setDraftData({ qty: 1 });
+      setDraftData({ qty: "1" });
     } else if (t === "Süpürgelik") {
-      setDraftData({ m: 10 });
+      setDraftData({ m: "10" });
     } else {
-      setDraftData({ w: 100, h: 100, d: 60, material: "Lake" });
+      setDraftData({ w: "100", h: "100", d: "60", material: "Lake" });
     }
   }
 
@@ -438,6 +439,11 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     );
   }
 
+  // ✅ FIX helper: input -> string update (cursor bozulmasın)
+  function setDraftField(key) {
+    return (e) => setDraftData((x) => ({ ...x, [key]: e.target.value }));
+  }
+
   function DraftForm() {
     const t = draftType;
     const d = draftData;
@@ -464,14 +470,14 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               </div>
               <div>
                 <div style={S.mini}>Tavan (cm)</div>
-                <input style={S.input} value={String(d.ceilingCm ?? 260)} onChange={(e) => setDraftData((x) => ({ ...x, ceilingCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.ceilingCm ?? ""} onChange={setDraftField("ceilingCm")} />
               </div>
             </div>
 
             {String(d.shape || "Duz") === "Duz" && (
               <div>
                 <div style={S.mini}>Toplam duvar (cm)</div>
-                <input style={S.input} value={String(d.totalWallCm ?? 600)} onChange={(e) => setDraftData((x) => ({ ...x, totalWallCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.totalWallCm ?? ""} onChange={setDraftField("totalWallCm")} />
               </div>
             )}
 
@@ -479,18 +485,18 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={S.grid3}>
                 <div>
                   <div style={S.mini}>Duvar A (cm)</div>
-                  <input style={S.input} value={String(d.wallAcm ?? 400)} onChange={(e) => setDraftData((x) => ({ ...x, wallAcm: toNum(e.target.value) }))} />
+                  <input style={S.input} value={d.wallAcm ?? ""} onChange={setDraftField("wallAcm")} />
                 </div>
                 <div>
                   <div style={S.mini}>Duvar B (cm)</div>
-                  <input style={S.input} value={String(d.wallBcm ?? 500)} onChange={(e) => setDraftData((x) => ({ ...x, wallBcm: toNum(e.target.value) }))} />
+                  <input style={S.input} value={d.wallBcm ?? ""} onChange={setDraftField("wallBcm")} />
                 </div>
                 <div>
                   <div style={S.mini}>Duvar C (cm)</div>
                   <input
                     style={S.input}
-                    value={String(d.wallCcm ?? 300)}
-                    onChange={(e) => setDraftData((x) => ({ ...x, wallCcm: toNum(e.target.value) }))}
+                    value={d.wallCcm ?? ""}
+                    onChange={setDraftField("wallCcm")}
                     disabled={String(d.shape || "Duz") !== "U"}
                   />
                 </div>
@@ -500,15 +506,15 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             <div style={S.grid3}>
               <div>
                 <div style={S.mini}>Buzdolabı (cm)</div>
-                <input style={S.input} value={String(d.fridgeCm ?? 90)} onChange={(e) => setDraftData((x) => ({ ...x, fridgeCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.fridgeCm ?? ""} onChange={setDraftField("fridgeCm")} />
               </div>
               <div>
                 <div style={S.mini}>Boy ankastre (cm)</div>
-                <input style={S.input} value={String(d.tallOvenCm ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, tallOvenCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.tallOvenCm ?? ""} onChange={setDraftField("tallOvenCm")} />
               </div>
               <div>
                 <div style={S.mini}>Ada (cm)</div>
-                <input style={S.input} value={String(d.islandCm ?? 0)} onChange={(e) => setDraftData((x) => ({ ...x, islandCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.islandCm ?? ""} onChange={setDraftField("islandCm")} />
               </div>
             </div>
 
@@ -528,18 +534,18 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             <div style={S.grid2}>
               <div>
                 <div style={S.mini}>Alt dolap eni (cm)</div>
-                <input style={S.input} value={String(d.runAltCm ?? 120)} onChange={(e) => setDraftData((x) => ({ ...x, runAltCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.runAltCm ?? ""} onChange={setDraftField("runAltCm")} />
               </div>
               <div>
                 <div style={S.mini}>Tavan (cm)</div>
-                <input style={S.input} value={String(d.ceilingCm ?? 260)} onChange={(e) => setDraftData((x) => ({ ...x, ceilingCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.ceilingCm ?? ""} onChange={setDraftField("ceilingCm")} />
               </div>
             </div>
 
             <div style={S.grid2}>
               <div>
                 <div style={S.mini}>Boy dolap toplam eni (cm)</div>
-                <input style={S.input} value={String(d.tallTotalCm ?? 0)} onChange={(e) => setDraftData((x) => ({ ...x, tallTotalCm: toNum(e.target.value) }))} />
+                <input style={S.input} value={d.tallTotalCm ?? ""} onChange={setDraftField("tallTotalCm")} />
               </div>
               <div>
                 <div style={S.mini}>Üst dolap</div>
@@ -594,16 +600,16 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <>
                 <div style={S.mini}>Çamaşır kabini (cm)</div>
                 <div style={S.grid3}>
-                  <input style={S.input} value={String(d.wmW ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, wmW: toNum(e.target.value) }))} placeholder="En" />
-                  <input style={S.input} value={String(d.wmH ?? 200)} onChange={(e) => setDraftData((x) => ({ ...x, wmH: toNum(e.target.value) }))} placeholder="Boy" />
-                  <input style={S.input} value={String(d.wmD ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, wmD: toNum(e.target.value) }))} placeholder="Derinlik" />
+                  <input style={S.input} value={d.wmW ?? ""} onChange={setDraftField("wmW")} placeholder="En" />
+                  <input style={S.input} value={d.wmH ?? ""} onChange={setDraftField("wmH")} placeholder="Boy" />
+                  <input style={S.input} value={d.wmD ?? ""} onChange={setDraftField("wmD")} placeholder="Derinlik" />
                 </div>
 
                 <div style={S.mini}>Kiler dolabı (cm)</div>
                 <div style={S.grid3}>
-                  <input style={S.input} value={String(d.panW ?? 45)} onChange={(e) => setDraftData((x) => ({ ...x, panW: toNum(e.target.value) }))} placeholder="En" />
-                  <input style={S.input} value={String(d.panH ?? 200)} onChange={(e) => setDraftData((x) => ({ ...x, panH: toNum(e.target.value) }))} placeholder="Boy" />
-                  <input style={S.input} value={String(d.panD ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, panD: toNum(e.target.value) }))} placeholder="Derinlik" />
+                  <input style={S.input} value={d.panW ?? ""} onChange={setDraftField("panW")} placeholder="En" />
+                  <input style={S.input} value={d.panH ?? ""} onChange={setDraftField("panH")} placeholder="Boy" />
+                  <input style={S.input} value={d.panD ?? ""} onChange={setDraftField("panD")} placeholder="Derinlik" />
                 </div>
               </>
             )}
@@ -614,9 +620,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <>
             <div style={S.mini}>Ölçüler (cm)</div>
             <div style={S.grid3}>
-              <input style={S.input} value={String(d.w ?? 300)} onChange={(e) => setDraftData((x) => ({ ...x, w: toNum(e.target.value) }))} placeholder="En" />
-              <input style={S.input} value={String(d.h ?? 250)} onChange={(e) => setDraftData((x) => ({ ...x, h: toNum(e.target.value) }))} placeholder="Boy" />
-              <input style={S.input} value={String(d.d ?? 40)} onChange={(e) => setDraftData((x) => ({ ...x, d: toNum(e.target.value) }))} placeholder="Derinlik" />
+              <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
+              <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
+              <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
             </div>
           </>
         )}
@@ -625,9 +631,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <>
             <div style={S.mini}>Ölçüler (cm)</div>
             <div style={S.grid3}>
-              <input style={S.input} value={String(d.w ?? 100)} onChange={(e) => setDraftData((x) => ({ ...x, w: toNum(e.target.value) }))} placeholder="En" />
-              <input style={S.input} value={String(d.h ?? 250)} onChange={(e) => setDraftData((x) => ({ ...x, h: toNum(e.target.value) }))} placeholder="Boy" />
-              <input style={S.input} value={String(d.d ?? 10)} onChange={(e) => setDraftData((x) => ({ ...x, d: toNum(e.target.value) }))} placeholder="Derinlik" />
+              <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
+              <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
+              <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
             </div>
           </>
         )}
@@ -635,7 +641,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         {t === "Kapı" && (
           <>
             <div style={S.mini}>Adet</div>
-            <input style={S.input} value={String(d.qty ?? 1)} onChange={(e) => setDraftData((x) => ({ ...x, qty: Math.max(0, Math.floor(toNum(e.target.value))) }))} />
+            <input style={S.input} value={d.qty ?? ""} onChange={setDraftField("qty")} />
             <div style={S.mini}>Detay: Lake</div>
           </>
         )}
@@ -643,7 +649,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         {t === "Süpürgelik" && (
           <>
             <div style={S.mini}>Metre</div>
-            <input style={S.input} value={String(d.m ?? 10)} onChange={(e) => setDraftData((x) => ({ ...x, m: Math.max(0, toNum(e.target.value)) }))} />
+            <input style={S.input} value={d.m ?? ""} onChange={setDraftField("m")} />
             <div style={S.mini}>Detay: Lake</div>
           </>
         )}
@@ -652,9 +658,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <>
             <div style={S.mini}>Ölçüler (cm)</div>
             <div style={S.grid3}>
-              <input style={S.input} value={String(d.w ?? 100)} onChange={(e) => setDraftData((x) => ({ ...x, w: toNum(e.target.value) }))} placeholder="En" />
-              <input style={S.input} value={String(d.h ?? 100)} onChange={(e) => setDraftData((x) => ({ ...x, h: toNum(e.target.value) }))} placeholder="Boy" />
-              <input style={S.input} value={String(d.d ?? 60)} onChange={(e) => setDraftData((x) => ({ ...x, d: toNum(e.target.value) }))} placeholder="Derinlik" />
+              <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
+              <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
+              <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
             </div>
           </>
         )}
@@ -671,7 +677,11 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             </div>
           </div>
           <div style={S.mini}>
-            {draftType === "Kapı" ? "Malzeme: Lake" : draftType === "Süpürgelik" ? "Malzeme: Lake" : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
+            {draftType === "Kapı"
+              ? "Malzeme: Lake"
+              : draftType === "Süpürgelik"
+              ? "Malzeme: Lake"
+              : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
           </div>
         </div>
       </div>
@@ -736,41 +746,46 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     const company = settings.companyInfo || {};
     const logoUrl = company.logoDataUrl || "";
 
-    // A4 (yaklaşık) px: 794 x 1123 @96dpi
+    // A4 px (yaklaşık)
     const A4_W = 794;
     const A4_H = 1123;
 
-    const wrapRef = useRef(null);
+    const sheetRef = useRef(null);
     const contentRef = useRef(null);
     const [fitScale, setFitScale] = useState(1);
     const [exporting, setExporting] = useState(false);
 
-    // içerik uzunsa otomatik küçült
+    // İçerik ne kadar uzunsa A4 içine sığacak şekilde küçült
     useLayoutEffect(() => {
       const el = contentRef.current;
       if (!el) return;
+
       const h = el.scrollHeight || el.getBoundingClientRect().height || 0;
       if (!h) return;
 
       const s = Math.min(1, A4_H / h);
-      // aşırı küçülmeyi sınırlayalım (çok uzun içerikte bile okunur kalsın)
-      const clamped = Math.max(0.72, s);
-      setFitScale(clamped);
-    }, [itemsComputed.length, (project?.accessories || []).length, company.logoDataUrl, project?.customerName, project?.phone, project?.address]);
+      // çok uzun listede bile okunur kalsın:
+      setFitScale(Math.max(0.78, s));
+    }, [
+      itemsComputed.length,
+      (project?.accessories || []).length,
+      company.logoDataUrl,
+      project?.customerName,
+      project?.phone,
+      project?.address,
+    ]);
 
     async function exportJpg() {
       try {
         setExporting(true);
-
-        // buton görünmesin diye (export sırasında)
         await new Promise((r) => setTimeout(r, 50));
 
-        const node = wrapRef.current;
+        const node = sheetRef.current;
         if (!node) return;
 
         const canvas = await html2canvas(node, {
           backgroundColor: "#ffffff",
-          scale: 3, // kalite artır
+          scale: 3, // kalite ↑
           useCORS: true,
         });
 
@@ -784,7 +799,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       }
     }
 
-    const C = {
+    const ST = {
       shell: {
         width: A4_W,
         minHeight: A4_H,
@@ -794,8 +809,13 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         boxShadow: "0 14px 45px rgba(0,0,0,0.08)",
         overflow: "hidden",
       },
-      pad: { padding: 22 },
-      headerRow: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" },
+      pad: { padding: 20 },
+      headerGrid: {
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1.1fr 0.9fr",
+        gap: 14,
+        alignItems: "start",
+      },
       logoBox: {
         width: 120,
         height: 56,
@@ -808,29 +828,35 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         overflow: "hidden",
       },
       logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
-      companyText: { marginTop: 10, fontSize: 11, color: "#475569", lineHeight: 1.5, fontWeight: 700 },
-      rightBox: { textAlign: "right" },
-      title: { fontWeight: 950, letterSpacing: 1, fontSize: 14, color: "#0f172a" },
-      meta: { fontSize: 11, color: "#475569", fontWeight: 800, marginTop: 4 },
-      center: { textAlign: "center", marginTop: 14 },
-      projTitle: { fontWeight: 950, fontSize: 16, color: "#0f172a" },
-      customer: { fontSize: 12, color: "#334155", fontWeight: 800, marginTop: 4 },
-      small: { fontSize: 11, color: "#475569", fontWeight: 700, marginTop: 4 },
-      tableWrap: { marginTop: 16, border: "1px solid #eef0f4", borderRadius: 14, overflow: "hidden" },
+
+      companyName: { fontWeight: 950, fontSize: 13, color: "#0f172a" },
+      companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 700, lineHeight: 1.45 },
+
+      midTitle: { fontWeight: 950, fontSize: 15, color: "#0f172a", textAlign: "center", marginTop: 2 },
+      midCustomer: { fontWeight: 900, fontSize: 12, color: "#334155", textAlign: "center", marginTop: 4 },
+      midSmall: { fontSize: 10.8, color: "#475569", fontWeight: 700, textAlign: "center", marginTop: 4 },
+
+      rightTitle: { fontWeight: 950, letterSpacing: 1, fontSize: 13, color: "#0f172a", textAlign: "right" },
+      rightMeta: { fontSize: 10.8, color: "#475569", fontWeight: 800, textAlign: "right", marginTop: 4 },
+
+      divider: { marginTop: 12, borderTop: "1px solid #eef0f4" },
+
+      tableWrap: { marginTop: 12, border: "1px solid #eef0f4", borderRadius: 14, overflow: "hidden" },
+      head: { display: "grid", gridTemplateColumns: "1fr 160px", background: "#f8fafc" },
       th: { padding: 10, fontWeight: 900, fontSize: 11, color: "#334155" },
+      row: { display: "grid", gridTemplateColumns: "1fr 160px", borderTop: "1px solid #eef0f4" },
       td: { padding: 10, fontSize: 11, color: "#0f172a" },
       tdRight: { padding: 10, fontSize: 11, color: "#0f172a", textAlign: "right", fontWeight: 950 },
-      row: { display: "grid", gridTemplateColumns: "1fr 160px", borderTop: "1px solid #eef0f4" },
-      head: { display: "grid", gridTemplateColumns: "1fr 160px", background: "#f8fafc" },
-      totals: { marginTop: 14, display: "grid", gap: 6 },
+
+      totals: { marginTop: 12, display: "grid", gap: 6 },
       totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "#334155", fontWeight: 800 },
       grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 950, color: "#0f172a", marginTop: 2 },
-      footerGrid: { marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" },
-      notes: { fontSize: 10.5, color: "#475569", fontWeight: 700, lineHeight: 1.45, whiteSpace: "pre-line" },
+
+      footerGrid: { marginTop: 14, display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: 12, alignItems: "end" },
+      notes: { fontSize: 10.6, color: "#475569", fontWeight: 700, lineHeight: 1.45, whiteSpace: "pre-line" },
       signBox: { border: "1px dashed #cbd5e1", borderRadius: 14, padding: 12, minHeight: 70 },
-      signTitle: { fontSize: 10.5, fontWeight: 900, color: "#334155" },
-      signLine: { marginTop: 10, height: 34 },
-      actionBar: { marginTop: 12, display: "flex", justifyContent: "flex-end" },
+      signTitle: { fontSize: 10.6, fontWeight: 900, color: "#334155" },
+      actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end" },
       exportBtn: {
         padding: "10px 12px",
         borderRadius: 12,
@@ -841,65 +867,63 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       },
     };
 
-    // A4 fit wrapper: içerik scale edilir ama dış çerçeve değişmez
     return (
       <div>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <div
-            ref={wrapRef}
-            style={{
-              ...C.shell,
-              transformOrigin: "top center",
-            }}
-          >
+          <div ref={sheetRef} style={ST.shell}>
             <div
               ref={contentRef}
               style={{
-                ...C.pad,
+                ...ST.pad,
                 transform: `scale(${fitScale})`,
                 transformOrigin: "top left",
-                width: A4_W / fitScale,
+                width: A4_W / fitScale, // scale sonrası taşma olmasın
               }}
             >
-              {/* HEADER */}
-              <div style={C.headerRow}>
+              {/* HEADER: logo + proje/müşteri (logo ile hizalı) + teklif meta */}
+              <div style={ST.headerGrid}>
                 <div>
-                  <div style={C.logoBox}>
-                    {logoUrl ? <img src={logoUrl} alt="logo" style={C.logoImg} /> : <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>}
+                  <div style={ST.logoBox}>
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="logo" style={ST.logoImg} />
+                    ) : (
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>
+                    )}
                   </div>
-                  <div style={C.companyText}>
-                    <div style={{ fontWeight: 950, color: "#0f172a" }}>{company.name || "Şirket Adı"}</div>
-                    {company.address ? <div>{company.address}</div> : null}
-                    {company.phone ? <div>{company.phone}</div> : null}
-                    {company.email ? <div>{company.email}</div> : null}
+                  <div style={{ marginTop: 8 }}>
+                    <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
+                    {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
+                    {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
+                    {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
                   </div>
                 </div>
 
-                <div style={C.rightBox}>
-                  <div style={C.title}>TEKLİF</div>
-                  <div style={C.meta}>Tarih: {formatDate(offerDate)}</div>
-                  <div style={C.meta}>Kod: {code}</div>
+                <div>
+                  <div style={ST.midTitle}>{project.name}</div>
+                  <div style={ST.midCustomer}>{project.customerName}</div>
+                  {project.phone || project.address ? (
+                    <div style={ST.midSmall}>
+                      {project.phone ? `Tel: ${project.phone}` : ""}
+                      {project.phone && project.address ? " • " : ""}
+                      {project.address ? `Adres: ${project.address}` : ""}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div>
+                  <div style={ST.rightTitle}>TEKLİF</div>
+                  <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
+                  <div style={ST.rightMeta}>Kod: {code}</div>
                 </div>
               </div>
 
-              {/* CENTER INFO */}
-              <div style={C.center}>
-                <div style={C.projTitle}>{project.name}</div>
-                <div style={C.customer}>{project.customerName}</div>
-                {(project.phone || project.address) && (
-                  <div style={C.small}>
-                    {project.phone ? `Tel: ${project.phone}` : ""}
-                    {project.phone && project.address ? " • " : ""}
-                    {project.address ? `Adres: ${project.address}` : ""}
-                  </div>
-                )}
-              </div>
+              <div style={ST.divider} />
 
               {/* TABLE */}
-              <div style={C.tableWrap}>
-                <div style={C.head}>
-                  <div style={C.th}>Kalem / Detay</div>
-                  <div style={{ ...C.th, textAlign: "right" }}>Tutar</div>
+              <div style={ST.tableWrap}>
+                <div style={ST.head}>
+                  <div style={ST.th}>Kalem / Detay</div>
+                  <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
                 </div>
 
                 {itemsComputed.map((it) => {
@@ -915,22 +939,22 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
                   if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
 
                   return (
-                    <div key={it.id} style={C.row}>
-                      <div style={C.td}>
-                        <div style={{ fontWeight: 950, fontSize: 11.5 }}>{it.name}</div>
-                        {detail ? <div style={{ fontSize: 10.5, color: "#475569", fontWeight: 700, marginTop: 2 }}>{detail}</div> : null}
+                    <div key={it.id} style={ST.row}>
+                      <div style={ST.td}>
+                        <div style={{ fontWeight: 950, fontSize: 11.6 }}>{it.name}</div>
+                        {detail ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>{detail}</div> : null}
                       </div>
-                      <div style={C.tdRight}>{currency(it._price || 0)}</div>
+                      <div style={ST.tdRight}>{currency(it._price || 0)}</div>
                     </div>
                   );
                 })}
 
-                {/* AKSESUAR SATIRI (varsa) */}
-                {(project.accessories || []).length > 0 && (
-                  <div style={C.row}>
-                    <div style={C.td}>
-                      <div style={{ fontWeight: 950, fontSize: 11.5 }}>Aksesuarlar</div>
-                      <div style={{ fontSize: 10.5, color: "#475569", fontWeight: 700, marginTop: 2 }}>
+                {/* Aksesuar satırı */}
+                {project.accessories?.length > 0 && (
+                  <div style={ST.row}>
+                    <div style={ST.td}>
+                      <div style={{ fontWeight: 950, fontSize: 11.6 }}>Aksesuarlar</div>
+                      <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>
                         {(project.accessories || [])
                           .map((r) => {
                             const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
@@ -941,45 +965,45 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
                           .join(" • ")}
                       </div>
                     </div>
-                    <div style={C.tdRight}>{currency(accessoriesTotal)}</div>
+                    <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
                   </div>
                 )}
               </div>
 
               {/* TOTALS */}
-              <div style={C.totals}>
-                <div style={C.totalRow}>
+              <div style={ST.totals}>
+                <div style={ST.totalRow}>
                   <div>Kalemler Toplamı</div>
                   <div>{currency(itemsTotal)}</div>
                 </div>
-                <div style={C.totalRow}>
+                <div style={ST.totalRow}>
                   <div>Aksesuar Toplamı</div>
                   <div>{currency(accessoriesTotal)}</div>
                 </div>
-                <div style={C.grandRow}>
+                <div style={ST.grandRow}>
                   <div>Genel Toplam</div>
                   <div>{currency(grandTotal)}</div>
                 </div>
               </div>
 
               {/* FOOTER */}
-              <div style={C.footerGrid}>
-                <div style={C.notes}>
+              <div style={ST.footerGrid}>
+                <div style={ST.notes}>
                   {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
                 </div>
 
-                <div style={C.signBox}>
-                  <div style={C.signTitle}>Müşteri İmza</div>
-                  <div style={C.signLine} />
+                <div style={ST.signBox}>
+                  <div style={ST.signTitle}>Müşteri İmza</div>
+                  <div style={{ height: 34, marginTop: 10 }} />
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* EXPORT BUTTON (sağda, export sırasında gizlenir) */}
-        <div style={{ ...C.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
-          <button style={C.exportBtn} onClick={exportJpg}>
+        {/* export butonu (export sırasında gizlenir) */}
+        <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
+          <button style={ST.exportBtn} onClick={exportJpg}>
             JPEG Çıktı Al
           </button>
         </div>
