@@ -1,5 +1,334 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import html2canvas from "html2canvas";
+
+/* =========================================================
+   ✅ FIX: Draft form componentleri DIŞARIDA tanımlı
+   (ProjectScreen her setState’te re-render olsa bile
+    DraftForm component referansı değişmez => focus kaçmaz)
+   ========================================================= */
+
+function DraftMaterialPicker({ draftType, draftData, setDraftData, S }) {
+  if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
+
+  return (
+    <div>
+      <div style={S.mini}>Malzeme</div>
+      <select
+        style={S.select}
+        value={draftData.material || "Lake"}
+        onChange={(e) => setDraftData((x) => ({ ...x, material: e.target.value }))}
+      >
+        <option value="MDFLAM">MDFLAM</option>
+        <option value="HGloss">High Gloss</option>
+        <option value="LakPanel">Lak Panel</option>
+        <option value="Lake">Lake</option>
+      </select>
+    </div>
+  );
+}
+
+function DraftFormUI({
+  draftType,
+  draftName,
+  setDraftName,
+  draftData,
+  setDraftData,
+  S,
+  materialLabel,
+  computeItem,
+  roundUpThousands,
+  currency,
+  normalizeType,
+}) {
+  const d = draftData;
+
+  // inputlarda cursor/focus bozulmasın diye STRING yazıyoruz
+  const setDraftField = (key) => (e) => {
+    const v = e.target.value;
+    setDraftData((x) => ({ ...x, [key]: v }));
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div>
+        <div style={S.mini}>Kalem Adı (istersen değiştir)</div>
+        <input
+          style={S.input}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          placeholder={draftType}
+        />
+      </div>
+
+      <DraftMaterialPicker
+        draftType={draftType}
+        draftData={draftData}
+        setDraftData={setDraftData}
+        S={S}
+      />
+
+      {draftType === "Mutfak" && (
+        <>
+          <div style={S.grid2}>
+            <div>
+              <div style={S.mini}>Şekil</div>
+              <select
+                style={S.select}
+                value={d.shape || "Duz"}
+                onChange={(e) => setDraftData((x) => ({ ...x, shape: e.target.value }))}
+              >
+                <option value="Duz">Düz</option>
+                <option value="L">L</option>
+                <option value="U">U</option>
+              </select>
+            </div>
+            <div>
+              <div style={S.mini}>Tavan (cm)</div>
+              <input style={S.input} value={d.ceilingCm ?? ""} onChange={setDraftField("ceilingCm")} />
+            </div>
+          </div>
+
+          {String(d.shape || "Duz") === "Duz" && (
+            <div>
+              <div style={S.mini}>Toplam duvar (cm)</div>
+              <input style={S.input} value={d.totalWallCm ?? ""} onChange={setDraftField("totalWallCm")} />
+            </div>
+          )}
+
+          {(String(d.shape || "Duz") === "L" || String(d.shape || "Duz") === "U") && (
+            <div style={S.grid3}>
+              <div>
+                <div style={S.mini}>Duvar A (cm)</div>
+                <input style={S.input} value={d.wallAcm ?? ""} onChange={setDraftField("wallAcm")} />
+              </div>
+              <div>
+                <div style={S.mini}>Duvar B (cm)</div>
+                <input style={S.input} value={d.wallBcm ?? ""} onChange={setDraftField("wallBcm")} />
+              </div>
+              <div>
+                <div style={S.mini}>Duvar C (cm)</div>
+                <input
+                  style={S.input}
+                  value={d.wallCcm ?? ""}
+                  onChange={setDraftField("wallCcm")}
+                  disabled={String(d.shape || "Duz") !== "U"}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={S.grid3}>
+            <div>
+              <div style={S.mini}>Buzdolabı (cm)</div>
+              <input style={S.input} value={d.fridgeCm ?? ""} onChange={setDraftField("fridgeCm")} />
+            </div>
+            <div>
+              <div style={S.mini}>Boy ankastre (cm)</div>
+              <input style={S.input} value={d.tallOvenCm ?? ""} onChange={setDraftField("tallOvenCm")} />
+            </div>
+            <div>
+              <div style={S.mini}>Ada (cm)</div>
+              <input style={S.input} value={d.islandCm ?? ""} onChange={setDraftField("islandCm")} />
+            </div>
+          </div>
+
+          <div>
+            <div style={S.mini}>Üst dolap modu</div>
+            <select
+              style={S.select}
+              value={d.upperMode || "IkiKat"}
+              onChange={(e) => setDraftData((x) => ({ ...x, upperMode: e.target.value }))}
+            >
+              <option value="IkiKat">2 Katman (70 + 40)</option>
+              <option value="Full">Full</option>
+              <option value="Yok">Yok / Raf</option>
+            </select>
+          </div>
+        </>
+      )}
+
+      {draftType === "Kahve Köşesi" && (
+        <>
+          <div style={S.grid2}>
+            <div>
+              <div style={S.mini}>Alt dolap eni (cm)</div>
+              <input style={S.input} value={d.runAltCm ?? ""} onChange={setDraftField("runAltCm")} />
+            </div>
+            <div>
+              <div style={S.mini}>Tavan (cm)</div>
+              <input style={S.input} value={d.ceilingCm ?? ""} onChange={setDraftField("ceilingCm")} />
+            </div>
+          </div>
+
+          <div style={S.grid2}>
+            <div>
+              <div style={S.mini}>Boy dolap toplam eni (cm)</div>
+              <input style={S.input} value={d.tallTotalCm ?? ""} onChange={setDraftField("tallTotalCm")} />
+            </div>
+            <div>
+              <div style={S.mini}>Üst dolap</div>
+              <select
+                style={S.select}
+                value={d.hasUpper ? "Evet" : "Hayır"}
+                onChange={(e) => setDraftData((x) => ({ ...x, hasUpper: e.target.value === "Evet" }))}
+              >
+                <option value="Evet">Var</option>
+                <option value="Hayır">Yok</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div style={S.mini}>Bazalı üst dolap</div>
+            <select
+              style={S.select}
+              value={d.hasBazali ? "Evet" : "Hayır"}
+              onChange={(e) => setDraftData((x) => ({ ...x, hasBazali: e.target.value === "Evet" }))}
+            >
+              <option value="Hayır">Yok</option>
+              <option value="Evet">Var</option>
+            </select>
+          </div>
+        </>
+      )}
+
+      {draftType === "Hilton" && (
+        <>
+          <div style={S.grid2}>
+            <div>
+              <div style={S.mini}>Tip</div>
+              <select
+                style={S.select}
+                value={d.tip || "Tip1"}
+                onChange={(e) => setDraftData((x) => ({ ...x, tip: e.target.value }))}
+              >
+                <option value="Tip1">Tip 1</option>
+                <option value="Tip2">Tip 2</option>
+                <option value="Tip3">Tip 3</option>
+              </select>
+            </div>
+            <div>
+              <div style={S.mini}>Lavabo</div>
+              <select
+                style={S.select}
+                value={String(d.size || "80")}
+                onChange={(e) => setDraftData((x) => ({ ...x, size: e.target.value }))}
+              >
+                <option value="60">60</option>
+                <option value="80">80</option>
+                <option value="100">100</option>
+                <option value="120">120</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div style={S.mini}>Ayna dolap</div>
+            <select
+              style={S.select}
+              value={d.mirrorCabinet ? "Evet" : "Hayır"}
+              onChange={(e) => setDraftData((x) => ({ ...x, mirrorCabinet: e.target.value === "Evet" }))}
+            >
+              <option value="Hayır">Yok</option>
+              <option value="Evet">Var</option>
+            </select>
+          </div>
+
+          {String(d.tip || "Tip1") === "Tip3" && (
+            <>
+              <div style={S.mini}>Çamaşır kabini (cm)</div>
+              <div style={S.grid3}>
+                <input style={S.input} value={d.wmW ?? ""} onChange={setDraftField("wmW")} placeholder="En" />
+                <input style={S.input} value={d.wmH ?? ""} onChange={setDraftField("wmH")} placeholder="Boy" />
+                <input style={S.input} value={d.wmD ?? ""} onChange={setDraftField("wmD")} placeholder="Derinlik" />
+              </div>
+
+              <div style={S.mini}>Kiler dolabı (cm)</div>
+              <div style={S.grid3}>
+                <input style={S.input} value={d.panW ?? ""} onChange={setDraftField("panW")} placeholder="En" />
+                <input style={S.input} value={d.panH ?? ""} onChange={setDraftField("panH")} placeholder="Boy" />
+                <input style={S.input} value={d.panD ?? ""} onChange={setDraftField("panD")} placeholder="Derinlik" />
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {draftType === "TV Ünitesi" && (
+        <>
+          <div style={S.mini}>Ölçüler (cm)</div>
+          <div style={S.grid3}>
+            <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
+            <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
+            <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
+          </div>
+        </>
+      )}
+
+      {draftType === "Seperatör" && (
+        <>
+          <div style={S.mini}>Ölçüler (cm)</div>
+          <div style={S.grid3}>
+            <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
+            <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
+            <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
+          </div>
+        </>
+      )}
+
+      {draftType === "Kapı" && (
+        <>
+          <div style={S.mini}>Adet</div>
+          <input style={S.input} value={d.qty ?? ""} onChange={setDraftField("qty")} />
+          <div style={S.mini}>Detay: Lake</div>
+        </>
+      )}
+
+      {draftType === "Süpürgelik" && (
+        <>
+          <div style={S.mini}>Metre</div>
+          <input style={S.input} value={d.m ?? ""} onChange={setDraftField("m")} />
+          <div style={S.mini}>Detay: Lake</div>
+        </>
+      )}
+
+      {draftType === "Sade Kalem" && (
+        <>
+          <div style={S.mini}>Ölçüler (cm)</div>
+          <div style={S.grid3}>
+            <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
+            <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
+            <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
+          </div>
+        </>
+      )}
+
+      {/* PREVIEW PRICE */}
+      <div style={{ ...S.box, background: "#f9fafb" }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={S.mini}>Ön İzleme</div>
+          <div style={{ fontWeight: 950 }}>
+            {(() => {
+              const tmp = computeItem({ type: draftType, data: draftData });
+              return currency(roundUpThousands(tmp.price));
+            })()}
+          </div>
+        </div>
+        <div style={S.mini}>
+          {draftType === "Kapı"
+            ? "Malzeme: Lake"
+            : draftType === "Süpürgelik"
+            ? "Malzeme: Lake"
+            : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   ===================== ProjectScreen ======================
+   ========================================================= */
 
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const project = state.projects.find((p) => p.id === projectId);
@@ -28,7 +357,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const [tab, setTab] = useState("kalemler");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Drawer form local state (KAYDETMEZSEK HİÇBİR ŞEY DEĞİŞMEZ)
+  // Drawer form local state
   const [draftType, setDraftType] = useState("Mutfak");
   const [draftName, setDraftName] = useState("");
   const [draftData, setDraftData] = useState({});
@@ -336,7 +665,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   // ---------- DRAWER OPEN/CLOSE ----------
   const itemTypes = ["Mutfak", "Kahve Köşesi", "Hilton", "Sade Kalem", "Seperatör", "TV Ünitesi", "Kapı", "Süpürgelik"];
 
-  // ✅ sayısal alanları STRING tutuyoruz (cursor/focus bozulmaz)
+  // ✅ draftData sayısal alanlar STRING (cursor/focus stabil)
   function initDraft(type) {
     const t = normalizeType(type);
     setDraftType(t);
@@ -424,271 +753,6 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     });
   }
 
-  // ✅ FIX: doğru isim + component gibi kullan
-  function DraftMaterialPicker() {
-    if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
-    return (
-      <div>
-        <div style={S.mini}>Malzeme</div>
-        <select
-          style={S.select}
-          value={draftData.material || "Lake"}
-          onChange={(e) => setDraftData((x) => ({ ...x, material: e.target.value }))}
-        >
-          <option value="MDFLAM">MDFLAM</option>
-          <option value="HGloss">High Gloss</option>
-          <option value="LakPanel">Lak Panel</option>
-          <option value="Lake">Lake</option>
-        </select>
-      </div>
-    );
-  }
-
-  // ✅ FIX helper: input -> string update (cursor bozulmasın)
-  function setDraftField(key) {
-    return (e) => setDraftData((x) => ({ ...x, [key]: e.target.value }));
-  }
-
-  const DraftForm = React.memo(function DraftForm() {
-    const t = draftType;
-    const d = draftData;
-
-    return (
-      <div style={{ display: "grid", gap: 10 }}>
-        <div>
-          <div style={S.mini}>Kalem Adı (istersen değiştir)</div>
-          <input style={S.input} value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={draftType} />
-        </div>
-
-        {/* ✅ FIX: function çağırma değil, component */}
-        <DraftMaterialPicker />
-
-        {t === "Mutfak" && (
-          <>
-            <div style={S.grid2}>
-              <div>
-                <div style={S.mini}>Şekil</div>
-                <select style={S.select} value={d.shape || "Duz"} onChange={(e) => setDraftData((x) => ({ ...x, shape: e.target.value }))}>
-                  <option value="Duz">Düz</option>
-                  <option value="L">L</option>
-                  <option value="U">U</option>
-                </select>
-              </div>
-              <div>
-                <div style={S.mini}>Tavan (cm)</div>
-                <input style={S.input} value={d.ceilingCm ?? ""} onChange={setDraftField("ceilingCm")} />
-              </div>
-            </div>
-
-            {String(d.shape || "Duz") === "Duz" && (
-              <div>
-                <div style={S.mini}>Toplam duvar (cm)</div>
-                <input style={S.input} value={d.totalWallCm ?? ""} onChange={setDraftField("totalWallCm")} />
-              </div>
-            )}
-
-            {(String(d.shape || "Duz") === "L" || String(d.shape || "Duz") === "U") && (
-              <div style={S.grid3}>
-                <div>
-                  <div style={S.mini}>Duvar A (cm)</div>
-                  <input style={S.input} value={d.wallAcm ?? ""} onChange={setDraftField("wallAcm")} />
-                </div>
-                <div>
-                  <div style={S.mini}>Duvar B (cm)</div>
-                  <input style={S.input} value={d.wallBcm ?? ""} onChange={setDraftField("wallBcm")} />
-                </div>
-                <div>
-                  <div style={S.mini}>Duvar C (cm)</div>
-                  <input style={S.input} value={d.wallCcm ?? ""} onChange={setDraftField("wallCcm")} disabled={String(d.shape || "Duz") !== "U"} />
-                </div>
-              </div>
-            )}
-
-            <div style={S.grid3}>
-              <div>
-                <div style={S.mini}>Buzdolabı (cm)</div>
-                <input style={S.input} value={d.fridgeCm ?? ""} onChange={setDraftField("fridgeCm")} />
-              </div>
-              <div>
-                <div style={S.mini}>Boy ankastre (cm)</div>
-                <input style={S.input} value={d.tallOvenCm ?? ""} onChange={setDraftField("tallOvenCm")} />
-              </div>
-              <div>
-                <div style={S.mini}>Ada (cm)</div>
-                <input style={S.input} value={d.islandCm ?? ""} onChange={setDraftField("islandCm")} />
-              </div>
-            </div>
-
-            <div>
-              <div style={S.mini}>Üst dolap modu</div>
-              <select style={S.select} value={d.upperMode || "IkiKat"} onChange={(e) => setDraftData((x) => ({ ...x, upperMode: e.target.value }))}>
-                <option value="IkiKat">2 Katman (70 + 40)</option>
-                <option value="Full">Full</option>
-                <option value="Yok">Yok / Raf</option>
-              </select>
-            </div>
-          </>
-        )}
-
-        {t === "Kahve Köşesi" && (
-          <>
-            <div style={S.grid2}>
-              <div>
-                <div style={S.mini}>Alt dolap eni (cm)</div>
-                <input style={S.input} value={d.runAltCm ?? ""} onChange={setDraftField("runAltCm")} />
-              </div>
-              <div>
-                <div style={S.mini}>Tavan (cm)</div>
-                <input style={S.input} value={d.ceilingCm ?? ""} onChange={setDraftField("ceilingCm")} />
-              </div>
-            </div>
-
-            <div style={S.grid2}>
-              <div>
-                <div style={S.mini}>Boy dolap toplam eni (cm)</div>
-                <input style={S.input} value={d.tallTotalCm ?? ""} onChange={setDraftField("tallTotalCm")} />
-              </div>
-              <div>
-                <div style={S.mini}>Üst dolap</div>
-                <select style={S.select} value={d.hasUpper ? "Evet" : "Hayır"} onChange={(e) => setDraftData((x) => ({ ...x, hasUpper: e.target.value === "Evet" }))}>
-                  <option value="Evet">Var</option>
-                  <option value="Hayır">Yok</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <div style={S.mini}>Bazalı üst dolap</div>
-              <select style={S.select} value={d.hasBazali ? "Evet" : "Hayır"} onChange={(e) => setDraftData((x) => ({ ...x, hasBazali: e.target.value === "Evet" }))}>
-                <option value="Hayır">Yok</option>
-                <option value="Evet">Var</option>
-              </select>
-            </div>
-          </>
-        )}
-
-        {t === "Hilton" && (
-          <>
-            <div style={S.grid2}>
-              <div>
-                <div style={S.mini}>Tip</div>
-                <select style={S.select} value={d.tip || "Tip1"} onChange={(e) => setDraftData((x) => ({ ...x, tip: e.target.value }))}>
-                  <option value="Tip1">Tip 1</option>
-                  <option value="Tip2">Tip 2</option>
-                  <option value="Tip3">Tip 3</option>
-                </select>
-              </div>
-              <div>
-                <div style={S.mini}>Lavabo</div>
-                <select style={S.select} value={String(d.size || "80")} onChange={(e) => setDraftData((x) => ({ ...x, size: e.target.value }))}>
-                  <option value="60">60</option>
-                  <option value="80">80</option>
-                  <option value="100">100</option>
-                  <option value="120">120</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <div style={S.mini}>Ayna dolap</div>
-              <select style={S.select} value={d.mirrorCabinet ? "Evet" : "Hayır"} onChange={(e) => setDraftData((x) => ({ ...x, mirrorCabinet: e.target.value === "Evet" }))}>
-                <option value="Hayır">Yok</option>
-                <option value="Evet">Var</option>
-              </select>
-            </div>
-
-            {String(d.tip || "Tip1") === "Tip3" && (
-              <>
-                <div style={S.mini}>Çamaşır kabini (cm)</div>
-                <div style={S.grid3}>
-                  <input style={S.input} value={d.wmW ?? ""} onChange={setDraftField("wmW")} placeholder="En" />
-                  <input style={S.input} value={d.wmH ?? ""} onChange={setDraftField("wmH")} placeholder="Boy" />
-                  <input style={S.input} value={d.wmD ?? ""} onChange={setDraftField("wmD")} placeholder="Derinlik" />
-                </div>
-
-                <div style={S.mini}>Kiler dolabı (cm)</div>
-                <div style={S.grid3}>
-                  <input style={S.input} value={d.panW ?? ""} onChange={setDraftField("panW")} placeholder="En" />
-                  <input style={S.input} value={d.panH ?? ""} onChange={setDraftField("panH")} placeholder="Boy" />
-                  <input style={S.input} value={d.panD ?? ""} onChange={setDraftField("panD")} placeholder="Derinlik" />
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {t === "TV Ünitesi" && (
-          <>
-            <div style={S.mini}>Ölçüler (cm)</div>
-            <div style={S.grid3}>
-              <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
-              <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
-              <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
-            </div>
-          </>
-        )}
-
-        {t === "Seperatör" && (
-          <>
-            <div style={S.mini}>Ölçüler (cm)</div>
-            <div style={S.grid3}>
-              <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
-              <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
-              <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
-            </div>
-          </>
-        )}
-
-        {t === "Kapı" && (
-          <>
-            <div style={S.mini}>Adet</div>
-            <input style={S.input} value={d.qty ?? ""} onChange={setDraftField("qty")} />
-            <div style={S.mini}>Detay: Lake</div>
-          </>
-        )}
-
-        {t === "Süpürgelik" && (
-          <>
-            <div style={S.mini}>Metre</div>
-            <input style={S.input} value={d.m ?? ""} onChange={setDraftField("m")} />
-            <div style={S.mini}>Detay: Lake</div>
-          </>
-        )}
-
-        {t === "Sade Kalem" && (
-          <>
-            <div style={S.mini}>Ölçüler (cm)</div>
-            <div style={S.grid3}>
-              <input style={S.input} value={d.w ?? ""} onChange={setDraftField("w")} placeholder="En" />
-              <input style={S.input} value={d.h ?? ""} onChange={setDraftField("h")} placeholder="Boy" />
-              <input style={S.input} value={d.d ?? ""} onChange={setDraftField("d")} placeholder="Derinlik" />
-            </div>
-          </>
-        )}
-
-        {/* PREVIEW PRICE */}
-        <div style={{ ...S.box, background: "#f9fafb" }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <div style={S.mini}>Ön İzleme</div>
-            <div style={{ fontWeight: 950 }}>
-              {(() => {
-                const tmp = computeItem({ type: draftType, data: draftData });
-                return currency(roundUpThousands(tmp.price));
-              })()}
-            </div>
-          </div>
-          <div style={S.mini}>
-            {draftType === "Kapı"
-              ? "Malzeme: Lake"
-              : draftType === "Süpürgelik"
-              ? "Malzeme: Lake"
-              : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
-          </div>
-        </div>
-      </div>
-    );
-  });
-
   function Drawer() {
     if (!drawerOpen) return null;
 
@@ -713,9 +777,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
                 <select
                   style={S.select}
                   value={draftType}
-                  onChange={(e) => {
-                    initDraft(e.target.value);
-                  }}
+                  onChange={(e) => initDraft(e.target.value)}
                 >
                   {itemTypes.map((t) => (
                     <option key={t} value={t}>
@@ -725,7 +787,20 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
                 </select>
               </div>
 
-              <DraftForm />
+              {/* ✅ FIX: DraftForm component artık stable */}
+              <DraftFormUI
+                draftType={draftType}
+                draftName={draftName}
+                setDraftName={setDraftName}
+                draftData={draftData}
+                setDraftData={setDraftData}
+                S={S}
+                materialLabel={materialLabel}
+                computeItem={computeItem}
+                roundUpThousands={roundUpThousands}
+                currency={currency}
+                normalizeType={normalizeType}
+              />
             </div>
           </div>
 
@@ -742,7 +817,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     );
   }
 
-  // ---------- OFFER VIEW ----------
+  // ---------- OFFER VIEW (A4'e OTOMATİK SIĞDIR + LOGO + DİPNOT + İMZA) ----------
   function OfferView() {
     const company = settings.companyInfo || {};
     const logoUrl = company.logoDataUrl || "";
@@ -762,7 +837,14 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       if (!h) return;
       const s = Math.min(1, A4_H / h);
       setFitScale(Math.max(0.78, s));
-    }, [itemsComputed.length, (project?.accessories || []).length, company.logoDataUrl, project?.customerName, project?.phone, project?.address]);
+    }, [
+      itemsComputed.length,
+      (project?.accessories || []).length,
+      company.logoDataUrl,
+      project?.customerName,
+      project?.phone,
+      project?.address,
+    ]);
 
     async function exportJpg() {
       try {
@@ -789,10 +871,33 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     }
 
     const ST = {
-      shell: { width: A4_W, minHeight: A4_H, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, boxShadow: "0 14px 45px rgba(0,0,0,0.08)", overflow: "hidden" },
+      shell: {
+        width: A4_W,
+        minHeight: A4_H,
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 18,
+        boxShadow: "0 14px 45px rgba(0,0,0,0.08)",
+        overflow: "hidden",
+      },
       pad: { padding: 20 },
-      headerGrid: { display: "grid", gridTemplateColumns: "1.2fr 1.1fr 0.9fr", gap: 14, alignItems: "start" },
-      logoBox: { width: 120, height: 56, borderRadius: 12, border: "1px solid #eef0f4", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+      headerGrid: {
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1.1fr 0.9fr",
+        gap: 14,
+        alignItems: "start",
+      },
+      logoBox: {
+        width: 120,
+        height: 56,
+        borderRadius: 12,
+        border: "1px solid #eef0f4",
+        background: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      },
       logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
 
       companyName: { fontWeight: 950, fontSize: 13, color: "#0f172a" },
@@ -823,7 +928,14 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       signBox: { border: "1px dashed #cbd5e1", borderRadius: 14, padding: 12, minHeight: 70 },
       signTitle: { fontSize: 10.6, fontWeight: 900, color: "#334155" },
       actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end" },
-      exportBtn: { padding: "10px 12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "#fff", fontWeight: 900, cursor: "pointer" },
+      exportBtn: {
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid #e5e7eb",
+        background: "#fff",
+        fontWeight: 900,
+        cursor: "pointer",
+      },
     };
 
     return (
@@ -842,7 +954,11 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={ST.headerGrid}>
                 <div>
                   <div style={ST.logoBox}>
-                    {logoUrl ? <img src={logoUrl} alt="logo" style={ST.logoImg} /> : <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>}
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="logo" style={ST.logoImg} />
+                    ) : (
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>
+                    )}
                   </div>
                   <div style={{ marginTop: 8 }}>
                     <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
@@ -881,21 +997,25 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
                 {itemsComputed.map((it) => {
                   const t = normalizeType(it.type);
-                  const d = it.data || {};
+                  const dd = it.data || {};
                   let detail = "";
 
                   if (t === "Kapı") detail = "Lake";
                   else if (t === "Süpürgelik") detail = "Lake";
-                  else if (d.material) detail = materialLabel(d.material);
+                  else if (dd.material) detail = materialLabel(dd.material);
 
-                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
+                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${dd.shape || "Düz"}`;
+                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${dd.tip || "Tip1"} • ${dd.size || "80"}`;
 
                   return (
                     <div key={it.id} style={ST.row}>
                       <div style={ST.td}>
                         <div style={{ fontWeight: 950, fontSize: 11.6 }}>{it.name}</div>
-                        {detail ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>{detail}</div> : null}
+                        {detail ? (
+                          <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>
+                            {detail}
+                          </div>
+                        ) : null}
                       </div>
                       <div style={ST.tdRight}>{currency(it._price || 0)}</div>
                     </div>
