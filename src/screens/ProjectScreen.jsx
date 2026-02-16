@@ -767,94 +767,200 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   }
 
   // ---------- OFFER VIEW ----------
-  function OfferView() {
-    const company = settings.companyInfo || {};
-    return (
-      <div style={S.card}>
-        <div style={S.cardBody}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ whiteSpace: "pre-line" }}>
+ function OfferView() {
+  const company = settings.companyInfo || {};
+
+  // Kurumsal, beyaz ağırlıklı teklif stili
+  const T = {
+    page: {
+      background: "#ffffff",
+      border: "1px solid #eef0f4",
+      borderRadius: 18,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.05)",
+      overflow: "hidden",
+      fontFamily:
+        'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
+      color: "#0f172a",
+    },
+    pad: { padding: 18 },
+    row: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" },
+    muted: { fontSize: 12, color: "#64748b", fontWeight: 700, lineHeight: 1.4 },
+    h1: { fontSize: 16, fontWeight: 900, letterSpacing: 0.2 },
+    h2: { fontSize: 13, fontWeight: 900, letterSpacing: 0.2 },
+    big: { fontSize: 18, fontWeight: 950 },
+    hr: { height: 1, background: "#eef0f4", margin: "14px 0" },
+    pill: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 10px",
+      border: "1px solid #eef0f4",
+      borderRadius: 999,
+      background: "#f8fafc",
+      fontSize: 12,
+      fontWeight: 900,
+      color: "#111827",
+    },
+    table: { border: "1px solid #eef0f4", borderRadius: 14, overflow: "hidden" },
+    thRow: { display: "grid", gridTemplateColumns: "1fr 140px", background: "#f8fafc" },
+    th: { padding: 10, fontWeight: 950, fontSize: 12, color: "#0f172a" },
+    tr: { display: "grid", gridTemplateColumns: "1fr 140px", borderTop: "1px solid #eef0f4" },
+    tdL: { padding: 10, minWidth: 0 },
+    tdR: { padding: 10, textAlign: "right", fontWeight: 950 },
+    name: { fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+    detail: { fontSize: 12, color: "#64748b", fontWeight: 750, marginTop: 2 },
+    sumRow: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginTop: 12 },
+    foot: { display: "grid", gridTemplateColumns: "1fr 260px", gap: 14, alignItems: "end", marginTop: 14 },
+    noteBox: {
+      border: "1px solid #eef0f4",
+      borderRadius: 14,
+      padding: 12,
+      background: "#ffffff",
+    },
+    signBox: {
+      border: "1px solid #e5e7eb",
+      borderRadius: 14,
+      padding: 12,
+      background: "#ffffff",
+      height: 120,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+    },
+    signTitle: { fontSize: 12, fontWeight: 900, color: "#111827" },
+    signLine: { height: 1, background: "#e5e7eb", marginTop: 10 },
+    logoBox: {
+      width: 54,
+      height: 54,
+      borderRadius: 14,
+      border: "1px solid #eef0f4",
+      background: "#ffffff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontWeight: 950,
+      color: "#111827",
+      flex: "0 0 auto",
+    },
+  };
+
+  return (
+    <div style={T.page}>
+      <div style={T.pad}>
+        {/* ÜST BAŞLIK */}
+        <div style={T.row}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", minWidth: 0 }}>
+            {/* Logo alanı: İstersen buraya gerçek logo koyarız (img) */}
+            <div style={T.logoBox}>{(company.name || "L").slice(0, 1).toUpperCase()}</div>
+
+            <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 950 }}>{company.name || "Şirket Adı"}</div>
-              <div style={S.mini}>{company.address || ""}</div>
-              <div style={S.mini}>{company.phone || ""}</div>
-              <div style={S.mini}>{company.email || ""}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontWeight: 950 }}>TEKLİF</div>
-              <div style={S.mini}>Tarih: {formatDate(offerDate)}</div>
-              <div style={S.mini}>Kod: {code}</div>
+              {company.address ? <div style={T.muted}>{company.address}</div> : null}
+              <div style={T.muted}>
+                {company.phone ? `Tel: ${company.phone}` : ""}
+                {company.phone && company.email ? " • " : ""}
+                {company.email ? company.email : ""}
+              </div>
             </div>
           </div>
 
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <div style={{ fontWeight: 950, fontSize: 16 }}>{project.name}</div>
-            <div style={S.mini}>{project.customerName}</div>
-            {(project.phone || project.address) && (
-              <div style={S.mini}>
-                {project.phone ? `Tel: ${project.phone}` : ""}
-                {project.phone && project.address ? " • " : ""}
-                {project.address ? `Adres: ${project.address}` : ""}
-              </div>
-            )}
+          <div style={{ textAlign: "right" }}>
+            <div style={T.h1}>TEKLİF</div>
+            <div style={T.muted}>Tarih: {formatDate(offerDate)}</div>
+            <div style={T.pill}>Kod: {code}</div>
+          </div>
+        </div>
+
+        <div style={T.hr} />
+
+        {/* ORTA BAŞLIK */}
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 950, fontSize: 16 }}>{project.name}</div>
+          <div style={T.muted}>{project.customerName}</div>
+          {(project.phone || project.address) && (
+            <div style={T.muted}>
+              {project.phone ? `Tel: ${project.phone}` : ""}
+              {project.phone && project.address ? " • " : ""}
+              {project.address ? `Adres: ${project.address}` : ""}
+            </div>
+          )}
+        </div>
+
+        <div style={T.hr} />
+
+        {/* KALEMLER TABLOSU */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+          <div style={T.h2}>Kalemler</div>
+          <div style={T.muted}>Tutarlar 1000’lik yukarı yuvarlanır.</div>
+        </div>
+
+        <div style={{ marginTop: 10, ...T.table }}>
+          <div style={T.thRow}>
+            <div style={T.th}>Kalem / Detay</div>
+            <div style={{ ...T.th, textAlign: "right" }}>Tutar</div>
           </div>
 
-          <div style={{ marginTop: 14, borderTop: "1px solid #eef0f4", paddingTop: 12 }}>
-            <div style={{ fontWeight: 950, marginBottom: 8 }}>Kalemler</div>
+          {itemsComputed.map((it) => {
+            const t = normalizeType(it.type);
+            const d = it.data || {};
+            let detail = "";
 
-            <div style={{ border: "1px solid #eef0f4", borderRadius: 14, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", background: "#f9fafb" }}>
-                <div style={{ padding: 10, fontWeight: 900, fontSize: 12 }}>Kalem / Detay</div>
-                <div style={{ padding: 10, fontWeight: 900, fontSize: 12, textAlign: "right" }}>Tutar</div>
+            if (t === "Kapı") detail = "Lake";
+            else if (t === "Süpürgelik") detail = "Lake";
+            else if (d.material) detail = materialLabel(d.material);
+
+            if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
+            if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
+
+            return (
+              <div key={it.id} style={T.tr}>
+                <div style={T.tdL}>
+                  <div style={T.name}>{it.name}</div>
+                  {detail ? <div style={T.detail}>{detail}</div> : null}
+                </div>
+                <div style={T.tdR}>{currency(it._price || 0)}</div>
               </div>
+            );
+          })}
 
-              {itemsComputed.map((it) => {
-                const t = normalizeType(it.type);
-                const d = it.data || {};
-                let detail = "";
-
-                if (t === "Kapı") detail = "Lake";
-                else if (t === "Süpürgelik") detail = "Lake";
-                else if (d.material) detail = materialLabel(d.material);
-
-                if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-                if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
-
-                return (
-                  <div key={it.id} style={{ display: "grid", gridTemplateColumns: "1fr 140px", borderTop: "1px solid #eef0f4" }}>
-                    <div style={{ padding: 10 }}>
-                      <div style={{ fontWeight: 900 }}>{it.name}</div>
-                      {detail ? <div style={S.mini}>{detail}</div> : null}
-                    </div>
-                    <div style={{ padding: 10, textAlign: "right", fontWeight: 950 }}>{currency(it._price || 0)}</div>
-                  </div>
-                );
-              })}
+          {/* AKSESUAR TOPLAMI */}
+          <div style={{ ...T.tr, background: "#ffffff" }}>
+            <div style={T.tdL}>
+              <div style={T.name}>Aksesuarlar</div>
+              <div style={T.detail}>Projedeki seçilen aksesuar adetlerine göre</div>
             </div>
+            <div style={T.tdR}>{currency(accessoriesTotal || 0)}</div>
+          </div>
+        </div>
 
-            <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div style={S.mini}>Kalemler Toplamı</div>
-                <div style={{ fontWeight: 900 }}>{currency(itemsTotal)}</div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div style={S.mini}>Aksesuarlar Toplamı</div>
-                <div style={{ fontWeight: 900 }}>{currency(accessoriesTotal)}</div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <div style={S.mini}>Genel Toplam</div>
-                <div style={{ fontWeight: 950, fontSize: 18 }}>{currency(grandTotal)}</div>
-              </div>
-            </div>
+        {/* GENEL TOPLAM */}
+        <div style={T.sumRow}>
+          <div style={T.muted}>Genel Toplam</div>
+          <div style={T.big}>{currency(grandTotal)}</div>
+        </div>
 
-            <div style={{ marginTop: 12, borderTop: "1px solid #eef0f4", paddingTop: 10 }}>
-              <div style={S.mini}>KDV dahil değildir.</div>
-              <div style={S.mini}>Termin / montaj süresi teklif onaylandığı andan itibaren 60 gündür.</div>
-            </div>
+        <div style={T.hr} />
+
+        {/* ALT NOTLAR + İMZA */}
+        <div style={T.foot}>
+          <div style={T.noteBox}>
+            <div style={{ fontWeight: 950, marginBottom: 6 }}>Dipnotlar</div>
+            <div style={T.muted}>• Fiyatlara KDV dahil değildir.</div>
+            <div style={T.muted}>• Termin / montaj süresi teklif onaylandığı andan itibaren 60 gündür.</div>
+            <div style={T.muted}>• Mutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir.</div>
+          </div>
+
+          <div style={T.signBox}>
+            <div style={T.signTitle}>Müşteri İmzası</div>
+            <div style={{ flex: 1 }} />
+            <div style={T.signLine} />
+            <div style={{ ...T.muted, textAlign: "right" }}>Ad / Soyad</div>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // ---------- RENDER ----------
   return (
