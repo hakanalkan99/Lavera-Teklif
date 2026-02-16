@@ -728,7 +728,7 @@ function renderDraftMaterialPicker() {
                 </select>
               </div>
 
-              {renderDraftForm()}
+              <DraftForm />
             </div>
           </div>
 
