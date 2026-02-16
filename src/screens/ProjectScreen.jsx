@@ -424,20 +424,24 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     });
   }
 
-  function DraftMaterialPicker() {
-    if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
-    return (
-      <div>
-        <div style={S.mini}>Malzeme</div>
-        <select style={S.select} value={draftData.material || "Lake"} onChange={(e) => setDraftData((x) => ({ ...x, material: e.target.value }))}>
-          <option value="MDFLAM">MDFLAM</option>
-          <option value="HGloss">High Gloss</option>
-          <option value="LakPanel">Lak Panel</option>
-          <option value="Lake">Lake</option>
-        </select>
-      </div>
-    );
-  }
+function renderDraftMaterialPicker() {
+  if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
+  return (
+    <div>
+      <div style={S.mini}>Malzeme</div>
+      <select
+        style={S.select}
+        value={draftData.material || "Lake"}
+        onChange={(e) => setDraftData((x) => ({ ...x, material: e.target.value }))}
+      >
+        <option value="MDFLAM">MDFLAM</option>
+        <option value="HGloss">High Gloss</option>
+        <option value="LakPanel">Lak Panel</option>
+        <option value="Lake">Lake</option>
+      </select>
+    </div>
+  );
+}
 
   // ✅ FIX helper: input -> string update (cursor bozulmasın)
   function setDraftField(key) {
@@ -455,7 +459,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           <input style={S.input} value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={draftType} />
         </div>
 
-        <DraftMaterialPicker />
+        {DraftMaterialPicker()}
 
         {t === "Mutfak" && (
           <>
@@ -724,7 +728,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
                 </select>
               </div>
 
-              <DraftForm />
+              {renderDraftForm()}
             </div>
           </div>
 
