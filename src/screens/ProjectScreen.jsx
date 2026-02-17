@@ -891,8 +891,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     );
   }
 
-  // ---------------- OFFER VIEW (A4 fit + export) ----------------
-  // ---------- OFFER VIEW (A4 SABİT: antet sabit + dipnot/imza sabit + içerik ortada ölçeklenir) ----------
+// ---------- OFFER VIEW (A4 SABİT: antet sabit + dipnot/imza sabit + içerik ortada ölçeklenir) ----------
 function OfferView() {
   const company = settings.companyInfo || {};
   const logoUrl = company.logoDataUrl || "";
@@ -903,8 +902,8 @@ function OfferView() {
 
   // sabit yükseklikler
   const PAD = 22;
-  const HEADER_H = 150; // antet sabit
-  const FOOTER_H = 150; // dipnot+imza sabit
+  const HEADER_H = 168; // üst çerçeve + nefes
+  const FOOTER_H = 150;
 
   const sheetRef = useRef(null);
   const middleRef = useRef(null);
@@ -913,22 +912,40 @@ function OfferView() {
   const [fitScale, setFitScale] = useState(1);
   const [exporting, setExporting] = useState(false);
 
-  // Orta içerik (kalemler + totals) A4'ün ortasına sığsın diye ölçek
+  // Hilton tek satır: hesaplar
+  const hiltonPack = useMemo(() => {
+    const list = itemsComputed.filter((x) => normalizeType(x.type) === "Hilton");
+    const total = list.reduce((s, x) => s + (x._price || 0), 0);
+
+    const details = list.map((it) => {
+      const d = it.data || {};
+      const mat =
+        d.material ? materialLabel(d.material) : "Lake";
+      const tip = d.tip || "Tip1";
+      const size = d.size || "80";
+      // isim önemli değil ama açıklamada görmek iyi (istersen kaldırırız)
+      return `${it.name} • ${tip} • ${size} • ${mat}`;
+    });
+
+    return { list, total, details, has: list.length > 0 };
+  }, [itemsComputed]);
+
+  // Ortadaki içerik A4'ün ortasına sığsın diye ölçek
   useLayoutEffect(() => {
     const mid = middleRef.current;
     const content = middleContentRef.current;
     if (!mid || !content) return;
 
-    // Ortanın gerçek kullanılabilir yüksekliği
     const available = mid.clientHeight;
     const need = content.scrollHeight || content.getBoundingClientRect().height || 0;
     if (!available || !need) return;
 
     const s = Math.min(1, available / need);
-    // Çok uzun listede bile bozulmadan küçülsün (okunabilir alt limit)
     setFitScale(Math.max(0.72, s));
   }, [
     itemsComputed.length,
+    hiltonPack.total,
+    hiltonPack.has,
     (project?.accessories || []).length,
     project?.customerName,
     project?.phone,
@@ -968,13 +985,11 @@ function OfferView() {
   }
 
   const F = {
-    // sade tırnaksız font
     fontFamily:
       'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
   };
 
   const ST = {
-    // dış çerçeve A4 sabit
     shell: {
       width: A4_W,
       height: A4_H,
@@ -985,8 +1000,6 @@ function OfferView() {
       overflow: "hidden",
       ...F,
     },
-
-    // içeride kolon düzeni
     frame: {
       height: "100%",
       display: "flex",
@@ -995,19 +1008,25 @@ function OfferView() {
       boxSizing: "border-box",
     },
 
-    // ANTET (sabit)
-    header: {
+    // HEADER FRAME (tek çerçeve)
+    headerFrame: {
       height: HEADER_H,
+      border: "1px solid #eef0f4",
+      borderRadius: 16,
+      background: "#fff",
+      padding: 14,
+      boxSizing: "border-box",
       display: "grid",
-      gridTemplateColumns: "1.15fr 1.1fr 0.75fr",
-      gap: 14,
-      alignItems: "start",
+      gridTemplateColumns: "1fr 1.35fr 1fr",
+      gap: 12,
+      alignItems: "center",
     },
 
+    // logo kare
     logoBox: {
-      width: 140,
-      height: 64,
-      borderRadius: 12,
+      width: 82,
+      height: 82,
+      borderRadius: 14,
       border: "1px solid #eef0f4",
       background: "#fff",
       display: "flex",
@@ -1017,53 +1036,51 @@ function OfferView() {
     },
     logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
 
-    companyName: { fontWeight: 900, fontSize: 13.5, color: "#0f172a", marginTop: 8 },
-    companyLine: { fontSize: 11, color: "#475569", fontWeight: 600, lineHeight: 1.45 },
+    leftCol: { display: "flex", flexDirection: "column", alignItems: "center" },
+    companyName: { fontWeight: 900, fontSize: 12.8, color: "#0f172a", marginTop: 8, textAlign: "center" },
+    companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 600, lineHeight: 1.35, textAlign: "center" },
 
-    centerTitle: { fontWeight: 900, fontSize: 15.5, color: "#0f172a", textAlign: "center", marginTop: 2 },
-    centerCustomer: { fontWeight: 800, fontSize: 12.5, color: "#334155", textAlign: "center", marginTop: 6 },
-    centerSmall: { fontSize: 11, color: "#475569", fontWeight: 600, textAlign: "center", marginTop: 6, lineHeight: 1.3 },
+    // müşteri ortası gerçekten ortalı
+    centerCol: { textAlign: "center" },
+    centerTitle: { fontWeight: 900, fontSize: 15.3, color: "#0f172a" },
+    centerCustomer: { fontWeight: 850, fontSize: 12.8, color: "#334155", marginTop: 6 },
+    centerSmall: { fontSize: 10.9, color: "#475569", fontWeight: 600, marginTop: 6, lineHeight: 1.25 },
 
-    rightTitle: { fontWeight: 900, letterSpacing: 1, fontSize: 13.5, color: "#0f172a", textAlign: "right" },
-    rightMeta: { fontSize: 11, color: "#475569", fontWeight: 700, textAlign: "right", marginTop: 6 },
+    rightCol: { textAlign: "right" },
+    rightTitle: { fontWeight: 900, letterSpacing: 1, fontSize: 13.2, color: "#0f172a" },
+    rightMeta: { fontSize: 10.9, color: "#475569", fontWeight: 700, marginTop: 6 },
 
-    hr: { borderTop: "1px solid #eef0f4", marginTop: 10 },
-
-    // ORTA ALAN (sabit kalan yükseklik)
+    // ORTA
     middle: {
       flex: 1,
-      minHeight: 0, // flex overflow fix
-      paddingTop: 12,
+      minHeight: 0,
+      paddingTop: 10,     // biraz yukarı
       paddingBottom: 12,
       display: "flex",
       flexDirection: "column",
       gap: 10,
     },
 
-    // Tablo kutusu
     tableWrap: {
       border: "1px solid #eef0f4",
       borderRadius: 14,
       overflow: "hidden",
       background: "#fff",
     },
-
-    // başlık ve satır kolonları (sağ fiyat sabit ve görünür)
     head: {
       display: "grid",
       gridTemplateColumns: "1fr 170px",
       background: "#f8fafc",
     },
-    th: { padding: "10px 12px", fontWeight: 800, fontSize: 11.5, color: "#334155" },
-
+    th: { padding: "8px 12px", fontWeight: 800, fontSize: 11.4, color: "#334155" }, // biraz yukarı
     row: {
       display: "grid",
       gridTemplateColumns: "1fr 170px",
       borderTop: "1px solid #eef0f4",
     },
-    td: { padding: "10px 12px", fontSize: 11.5, color: "#0f172a" },
+    td: { padding: "9px 12px", fontSize: 11.5, color: "#0f172a" },
     tdRight: {
-      padding: "10px 12px",
+      padding: "9px 12px",
       fontSize: 11.5,
       color: "#0f172a",
       textAlign: "right",
@@ -1071,8 +1088,8 @@ function OfferView() {
       whiteSpace: "nowrap",
     },
 
-    itemName: { fontWeight: 900, fontSize: 12.2, color: "#0f172a" },
-    itemDetail: { marginTop: 3, fontSize: 11, color: "#475569", fontWeight: 600, lineHeight: 1.25 },
+    itemName: { fontWeight: 900, fontSize: 12.1, color: "#0f172a" },
+    itemDetail: { marginTop: 3, fontSize: 10.9, color: "#475569", fontWeight: 600, lineHeight: 1.25, whiteSpace: "pre-line" },
 
     totalsBox: {
       border: "1px solid #eef0f4",
@@ -1083,7 +1100,7 @@ function OfferView() {
     totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#334155", fontWeight: 800, marginTop: 6 },
     grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16.5, color: "#0f172a", fontWeight: 950, marginTop: 10 },
 
-    // FOOTER (sabit)
+    // FOOTER
     footer: {
       height: FOOTER_H,
       display: "grid",
@@ -1113,7 +1130,6 @@ function OfferView() {
     },
     signTitle: { fontSize: 11, fontWeight: 900, color: "#334155" },
 
-    // dıştaki aksiyon bar
     actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end", paddingRight: 6 },
     exportBtn: {
       padding: "10px 12px",
@@ -1126,14 +1142,17 @@ function OfferView() {
     },
   };
 
+  // Hilton harici satırları bas
+  const rowsNonHilton = itemsComputed.filter((it) => normalizeType(it.type) !== "Hilton");
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div ref={sheetRef} style={ST.shell}>
           <div style={ST.frame}>
-            {/* HEADER (sabit) */}
-            <div style={ST.header}>
-              <div>
+            {/* HEADER FRAME */}
+            <div style={ST.headerFrame}>
+              <div style={ST.leftCol}>
                 <div style={ST.logoBox}>
                   {logoUrl ? (
                     <img src={logoUrl} alt="logo" style={ST.logoImg} />
@@ -1148,7 +1167,7 @@ function OfferView() {
                 {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
               </div>
 
-              <div>
+              <div style={ST.centerCol}>
                 <div style={ST.centerTitle}>{project.name}</div>
                 <div style={ST.centerCustomer}>{project.customerName}</div>
                 {(project.phone || project.address) ? (
@@ -1160,16 +1179,14 @@ function OfferView() {
                 ) : null}
               </div>
 
-              <div>
+              <div style={ST.rightCol}>
                 <div style={ST.rightTitle}>TEKLİF</div>
                 <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
                 <div style={ST.rightMeta}>Kod: {code}</div>
               </div>
             </div>
 
-            <div style={ST.hr} />
-
-            {/* MIDDLE (ortası ölçekli) */}
+            {/* MIDDLE */}
             <div ref={middleRef} style={ST.middle}>
               <div
                 ref={middleContentRef}
@@ -1186,7 +1203,21 @@ function OfferView() {
                     <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
                   </div>
 
-                  {itemsComputed.map((it) => {
+                  {/* Hilton tek satır */}
+                  {hiltonPack.has && (
+                    <div style={ST.row}>
+                      <div style={ST.td}>
+                        <div style={ST.itemName}>Hilton</div>
+                        <div style={ST.itemDetail}>
+                          {hiltonPack.details.join("\n")}
+                        </div>
+                      </div>
+                      <div style={ST.tdRight}>{currency(hiltonPack.total)}</div>
+                    </div>
+                  )}
+
+                  {/* Diğer kalemler */}
+                  {rowsNonHilton.map((it) => {
                     const t = normalizeType(it.type);
                     const d = it.data || {};
                     let detail = "";
@@ -1196,7 +1227,6 @@ function OfferView() {
                     else if (d.material) detail = materialLabel(d.material);
 
                     if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-                    if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
 
                     return (
                       <div key={it.id} style={ST.row}>
@@ -1230,7 +1260,7 @@ function OfferView() {
                   )}
                 </div>
 
-                {/* TOTALS (aynen istedin gibi 3 satır) */}
+                {/* TOTALS */}
                 <div style={{ marginTop: 10, ...ST.totalsBox }}>
                   <div style={ST.totalRow}>
                     <div>Kalemler Toplamı</div>
@@ -1250,7 +1280,7 @@ function OfferView() {
               </div>
             </div>
 
-            {/* FOOTER (sabit) */}
+            {/* FOOTER */}
             <div style={ST.footer}>
               <div style={ST.notes}>
                 {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
