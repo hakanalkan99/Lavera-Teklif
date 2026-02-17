@@ -892,263 +892,388 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   }
 
   // ---------------- OFFER VIEW (A4 fit + export) ----------------
-  function OfferView() {
-    const company = settings.companyInfo || {};
-    const logoUrl = company.logoDataUrl || "";
+  // ---------- OFFER VIEW (A4 SABİT: antet sabit + dipnot/imza sabit + içerik ortada ölçeklenir) ----------
+function OfferView() {
+  const company = settings.companyInfo || {};
+  const logoUrl = company.logoDataUrl || "";
 
-    const A4_W = 794;
-    const A4_H = 1123;
+  // A4 px (yaklaşık, 96dpi)
+  const A4_W = 794;
+  const A4_H = 1123;
 
-    const sheetRef = useRef(null);
-    const contentRef = useRef(null);
-    const [fitScale, setFitScale] = useState(1);
-    const [exporting, setExporting] = useState(false);
+  // sabit yükseklikler
+  const PAD = 22;
+  const HEADER_H = 150; // antet sabit
+  const FOOTER_H = 150; // dipnot+imza sabit
 
-    useLayoutEffect(() => {
-      const el = contentRef.current;
-      if (!el) return;
-      const h = el.scrollHeight || el.getBoundingClientRect().height || 0;
-      if (!h) return;
+  const sheetRef = useRef(null);
+  const middleRef = useRef(null);
+  const middleContentRef = useRef(null);
 
-      const s = Math.min(1, A4_H / h);
-      setFitScale(Math.max(0.78, s));
-    }, [
-      itemsComputed.length,
-      (project?.accessories || []).length,
-      company.logoDataUrl,
-      project?.customerName,
-      project?.phone,
-      project?.address,
-    ]);
+  const [fitScale, setFitScale] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
-    async function exportJpg() {
-      try {
-        setExporting(true);
-        await new Promise((r) => setTimeout(r, 50));
+  // Orta içerik (kalemler + totals) A4'ün ortasına sığsın diye ölçek
+  useLayoutEffect(() => {
+    const mid = middleRef.current;
+    const content = middleContentRef.current;
+    if (!mid || !content) return;
 
-        const node = sheetRef.current;
-        if (!node) return;
+    // Ortanın gerçek kullanılabilir yüksekliği
+    const available = mid.clientHeight;
+    const need = content.scrollHeight || content.getBoundingClientRect().height || 0;
+    if (!available || !need) return;
 
-        const canvas = await html2canvas(node, {
-          backgroundColor: "#ffffff",
-          scale: 3,
-          useCORS: true,
-        });
+    const s = Math.min(1, available / need);
+    // Çok uzun listede bile bozulmadan küçülsün (okunabilir alt limit)
+    setFitScale(Math.max(0.72, s));
+  }, [
+    itemsComputed.length,
+    (project?.accessories || []).length,
+    project?.customerName,
+    project?.phone,
+    project?.address,
+    company.logoDataUrl,
+    accessoriesTotal,
+    itemsTotal,
+    grandTotal,
+  ]);
 
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-        const a = document.createElement("a");
-        a.href = dataUrl;
-        a.download = `${project?.projectNumber || "teklif"}${project?.currentVersion || "A"}-${(project?.customerName || "musteri").replaceAll(" ", "_")}.jpg`;
-        a.click();
-      } finally {
-        setExporting(false);
-      }
+  async function exportJpg() {
+    try {
+      setExporting(true);
+      await new Promise((r) => setTimeout(r, 60));
+
+      const node = sheetRef.current;
+      if (!node) return;
+
+      const canvas = await html2canvas(node, {
+        backgroundColor: "#ffffff",
+        scale: 3,
+        useCORS: true,
+      });
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${project?.projectNumber || "teklif"}${project?.currentVersion || "A"}-${(project?.customerName || "musteri")
+        .toString()
+        .replace(/[^\w\s-]/g, "")
+        .trim()
+        .replace(/\s+/g, "-")}.jpg`;
+      a.click();
+    } finally {
+      setExporting(false);
     }
+  }
 
-    const ST = {
-      shell: {
-        width: A4_W,
-        minHeight: A4_H,
-        background: "#fff",
-        border: "1px solid #e9edf3",
-        borderRadius: 18,
-        boxShadow: "0 14px 45px rgba(0,0,0,0.08)",
-        overflow: "hidden",
-      },
-      pad: { padding: 22 },
-      headerGrid: {
-        display: "grid",
-        gridTemplateColumns: "1.1fr 1.2fr 0.7fr",
-        gap: 14,
-        alignItems: "start",
-      },
-      logoBox: {
-        width: 130,
-        height: 58,
-        borderRadius: 12,
-        border: "1px solid #eef1f6",
-        background: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-      },
-      logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
+  const F = {
+    // sade tırnaksız font
+    fontFamily:
+      'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
+  };
 
-      companyName: { fontWeight: 950, fontSize: 13.2, color: "#0f172a" },
-      companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 750, lineHeight: 1.45 },
+  const ST = {
+    // dış çerçeve A4 sabit
+    shell: {
+      width: A4_W,
+      height: A4_H,
+      background: "#fff",
+      border: "1px solid #e5e7eb",
+      borderRadius: 16,
+      boxShadow: "0 12px 42px rgba(0,0,0,0.08)",
+      overflow: "hidden",
+      ...F,
+    },
 
-      midTitle: { fontWeight: 950, fontSize: 15.2, color: "#0f172a", textAlign: "center", marginTop: 2 },
-      midCustomer: { fontWeight: 900, fontSize: 12.2, color: "#334155", textAlign: "center", marginTop: 4 },
-      midSmall: { fontSize: 10.8, color: "#475569", fontWeight: 750, textAlign: "center", marginTop: 4 },
+    // içeride kolon düzeni
+    frame: {
+      height: "100%",
+      display: "flex",
+      flexDirection: "column",
+      padding: PAD,
+      boxSizing: "border-box",
+    },
 
-      rightTitle: { fontWeight: 950, letterSpacing: 1, fontSize: 13, color: "#0f172a", textAlign: "right" },
-      rightMeta: { fontSize: 10.8, color: "#475569", fontWeight: 850, textAlign: "right", marginTop: 4 },
+    // ANTET (sabit)
+    header: {
+      height: HEADER_H,
+      display: "grid",
+      gridTemplateColumns: "1.15fr 1.1fr 0.75fr",
+      gap: 14,
+      alignItems: "start",
+    },
 
-      divider: { marginTop: 12, borderTop: "1px solid #eef1f6" },
+    logoBox: {
+      width: 140,
+      height: 64,
+      borderRadius: 12,
+      border: "1px solid #eef0f4",
+      background: "#fff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
 
-      tableWrap: { marginTop: 12, border: "1px solid #eef1f6", borderRadius: 14, overflow: "hidden" },
-      head: { display: "grid", gridTemplateColumns: "1fr 160px", background: "#f8fafc" },
-      th: { padding: 10, fontWeight: 950, fontSize: 11, color: "#334155" },
-      row: { display: "grid", gridTemplateColumns: "1fr 160px", borderTop: "1px solid #eef1f6" },
-      td: { padding: 10, fontSize: 11, color: "#0f172a" },
-      tdRight: { padding: 10, fontSize: 11, color: "#0f172a", textAlign: "right", fontWeight: 950 },
+    companyName: { fontWeight: 900, fontSize: 13.5, color: "#0f172a", marginTop: 8 },
+    companyLine: { fontSize: 11, color: "#475569", fontWeight: 600, lineHeight: 1.45 },
 
-      totals: { marginTop: 12, display: "grid", gap: 6 },
-      totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "#334155", fontWeight: 850 },
-      grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 950, color: "#0f172a", marginTop: 2 },
+    centerTitle: { fontWeight: 900, fontSize: 15.5, color: "#0f172a", textAlign: "center", marginTop: 2 },
+    centerCustomer: { fontWeight: 800, fontSize: 12.5, color: "#334155", textAlign: "center", marginTop: 6 },
+    centerSmall: { fontSize: 11, color: "#475569", fontWeight: 600, textAlign: "center", marginTop: 6, lineHeight: 1.3 },
 
-      footerGrid: { marginTop: 14, display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: 12, alignItems: "end" },
-      notes: { fontSize: 10.6, color: "#475569", fontWeight: 750, lineHeight: 1.45, whiteSpace: "pre-line" },
-      signBox: { border: "1px dashed #cbd5e1", borderRadius: 14, padding: 12, minHeight: 70 },
-      signTitle: { fontSize: 10.6, fontWeight: 950, color: "#334155" },
+    rightTitle: { fontWeight: 900, letterSpacing: 1, fontSize: 13.5, color: "#0f172a", textAlign: "right" },
+    rightMeta: { fontSize: 11, color: "#475569", fontWeight: 700, textAlign: "right", marginTop: 6 },
 
-      actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end" },
-      exportBtn: {
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: "1px solid #e5e9f0",
-        background: "#fff",
-        fontWeight: 950,
-        cursor: "pointer",
-      },
-    };
+    hr: { borderTop: "1px solid #eef0f4", marginTop: 10 },
 
-    return (
-      <div>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <div ref={sheetRef} style={ST.shell}>
-            <div
-              ref={contentRef}
-              style={{
-                ...ST.pad,
-                transform: `scale(${fitScale})`,
-                transformOrigin: "top left",
-                width: A4_W / fitScale,
-              }}
-            >
-              <div style={ST.headerGrid}>
-                <div>
-                  <div style={ST.logoBox}>
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="logo" style={ST.logoImg} />
-                    ) : (
-                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 950 }}>LOGO</div>
-                    )}
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
-                    {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
-                    {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
-                    {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
-                  </div>
+    // ORTA ALAN (sabit kalan yükseklik)
+    middle: {
+      flex: 1,
+      minHeight: 0, // flex overflow fix
+      paddingTop: 12,
+      paddingBottom: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+
+    // Tablo kutusu
+    tableWrap: {
+      border: "1px solid #eef0f4",
+      borderRadius: 14,
+      overflow: "hidden",
+      background: "#fff",
+    },
+
+    // başlık ve satır kolonları (sağ fiyat sabit ve görünür)
+    head: {
+      display: "grid",
+      gridTemplateColumns: "1fr 170px",
+      background: "#f8fafc",
+    },
+    th: { padding: "10px 12px", fontWeight: 800, fontSize: 11.5, color: "#334155" },
+
+    row: {
+      display: "grid",
+      gridTemplateColumns: "1fr 170px",
+      borderTop: "1px solid #eef0f4",
+    },
+    td: { padding: "10px 12px", fontSize: 11.5, color: "#0f172a" },
+    tdRight: {
+      padding: "10px 12px",
+      fontSize: 11.5,
+      color: "#0f172a",
+      textAlign: "right",
+      fontWeight: 900,
+      whiteSpace: "nowrap",
+    },
+
+    itemName: { fontWeight: 900, fontSize: 12.2, color: "#0f172a" },
+    itemDetail: { marginTop: 3, fontSize: 11, color: "#475569", fontWeight: 600, lineHeight: 1.25 },
+
+    totalsBox: {
+      border: "1px solid #eef0f4",
+      borderRadius: 14,
+      padding: 12,
+      background: "#fff",
+    },
+    totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#334155", fontWeight: 800, marginTop: 6 },
+    grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16.5, color: "#0f172a", fontWeight: 950, marginTop: 10 },
+
+    // FOOTER (sabit)
+    footer: {
+      height: FOOTER_H,
+      display: "grid",
+      gridTemplateColumns: "1.35fr 0.65fr",
+      gap: 12,
+      alignItems: "end",
+      paddingTop: 12,
+      borderTop: "1px solid #eef0f4",
+    },
+    notes: {
+      fontSize: 11,
+      color: "#475569",
+      fontWeight: 600,
+      lineHeight: 1.45,
+      whiteSpace: "pre-line",
+    },
+    signBox: {
+      border: "1px dashed #cbd5e1",
+      borderRadius: 14,
+      padding: 12,
+      height: 98,
+      boxSizing: "border-box",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-start",
+      gap: 10,
+    },
+    signTitle: { fontSize: 11, fontWeight: 900, color: "#334155" },
+
+    // dıştaki aksiyon bar
+    actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end", paddingRight: 6 },
+    exportBtn: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      background: "#fff",
+      fontWeight: 900,
+      cursor: "pointer",
+      ...F,
+    },
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div ref={sheetRef} style={ST.shell}>
+          <div style={ST.frame}>
+            {/* HEADER (sabit) */}
+            <div style={ST.header}>
+              <div>
+                <div style={ST.logoBox}>
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="logo" style={ST.logoImg} />
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>
+                  )}
                 </div>
 
-                <div>
-                  <div style={ST.midTitle}>{project.name}</div>
-                  <div style={ST.midCustomer}>{project.customerName}</div>
-                  {project.phone || project.address ? (
-                    <div style={ST.midSmall}>
-                      {project.phone ? `Tel: ${project.phone}` : ""}
-                      {project.phone && project.address ? " • " : ""}
-                      {project.address ? `Adres: ${project.address}` : ""}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div>
-                  <div style={ST.rightTitle}>TEKLİF</div>
-                  <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
-                  <div style={ST.rightMeta}>Kod: {code}</div>
-                </div>
+                <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
+                {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
+                {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
+                {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
               </div>
 
-              <div style={ST.divider} />
+              <div>
+                <div style={ST.centerTitle}>{project.name}</div>
+                <div style={ST.centerCustomer}>{project.customerName}</div>
+                {(project.phone || project.address) ? (
+                  <div style={ST.centerSmall}>
+                    {project.phone ? `Tel: ${project.phone}` : ""}
+                    {project.phone && project.address ? " • " : ""}
+                    {project.address ? `Adres: ${project.address}` : ""}
+                  </div>
+                ) : null}
+              </div>
 
-              <div style={ST.tableWrap}>
-                <div style={ST.head}>
-                  <div style={ST.th}>Kalem / Detay</div>
-                  <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
-                </div>
+              <div>
+                <div style={ST.rightTitle}>TEKLİF</div>
+                <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
+                <div style={ST.rightMeta}>Kod: {code}</div>
+              </div>
+            </div>
 
-                {itemsComputed.map((it) => {
-                  const t = normalizeType(it.type);
-                  const d = it.data || {};
-                  let detail = "";
+            <div style={ST.hr} />
 
-                  if (t === "Kapı") detail = "Lake";
-                  else if (t === "Süpürgelik") detail = "Lake";
-                  else if (d.material) detail = materialLabel(d.material);
+            {/* MIDDLE (ortası ölçekli) */}
+            <div ref={middleRef} style={ST.middle}>
+              <div
+                ref={middleContentRef}
+                style={{
+                  transform: `scale(${fitScale})`,
+                  transformOrigin: "top left",
+                  width: `${100 / fitScale}%`,
+                }}
+              >
+                {/* TABLE */}
+                <div style={ST.tableWrap}>
+                  <div style={ST.head}>
+                    <div style={ST.th}>Kalem / Detay</div>
+                    <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
+                  </div>
 
-                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
+                  {itemsComputed.map((it) => {
+                    const t = normalizeType(it.type);
+                    const d = it.data || {};
+                    let detail = "";
 
-                  return (
-                    <div key={it.id} style={ST.row}>
+                    if (t === "Kapı") detail = "Lake";
+                    else if (t === "Süpürgelik") detail = "Lake";
+                    else if (d.material) detail = materialLabel(d.material);
+
+                    if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
+                    if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
+
+                    return (
+                      <div key={it.id} style={ST.row}>
+                        <div style={ST.td}>
+                          <div style={ST.itemName}>{it.name}</div>
+                          {detail ? <div style={ST.itemDetail}>{detail}</div> : null}
+                        </div>
+                        <div style={ST.tdRight}>{currency(it._price || 0)}</div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Aksesuar satırı */}
+                  {project.accessories?.length > 0 && (
+                    <div style={ST.row}>
                       <div style={ST.td}>
-                        <div style={{ fontWeight: 950, fontSize: 11.6 }}>{it.name}</div>
-                        {detail ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 750, marginTop: 2 }}>{detail}</div> : null}
+                        <div style={ST.itemName}>Aksesuarlar</div>
+                        <div style={ST.itemDetail}>
+                          {(project.accessories || [])
+                            .map((r) => {
+                              const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
+                              if (!def) return null;
+                              return `${def.name} x${r.quantity || 0}`;
+                            })
+                            .filter(Boolean)
+                            .join(" • ")}
+                        </div>
                       </div>
-                      <div style={ST.tdRight}>{currency(it._price || 0)}</div>
+                      <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
 
-                {project.accessories?.length > 0 && (
-                  <div style={ST.row}>
-                    <div style={ST.td}>
-                      <div style={{ fontWeight: 950, fontSize: 11.6 }}>Aksesuarlar</div>
-                      <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 750, marginTop: 2 }}>
-                        {(project.accessories || [])
-                          .map((r) => {
-                            const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
-                            if (!def) return null;
-                            return `${def.name} x${r.quantity || 0}`;
-                          })
-                          .filter(Boolean)
-                          .join(" • ")}
-                      </div>
-                    </div>
-                    <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
+                {/* TOTALS (aynen istedin gibi 3 satır) */}
+                <div style={{ marginTop: 10, ...ST.totalsBox }}>
+                  <div style={ST.totalRow}>
+                    <div>Kalemler Toplamı</div>
+                    <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(itemsTotal)}</div>
                   </div>
-                )}
-              </div>
 
-              <div style={ST.totals}>
-                <div style={ST.totalRow}>
-                  <div>Kalemler Toplamı</div>
-                  <div>{currency(itemsTotal)}</div>
-                </div>
-                <div style={ST.totalRow}>
-                  <div>Aksesuar Toplamı</div>
-                  <div>{currency(accessoriesTotal)}</div>
-                </div>
-                <div style={ST.grandRow}>
-                  <div>Genel Toplam</div>
-                  <div>{currency(grandTotal)}</div>
+                  <div style={ST.totalRow}>
+                    <div>Aksesuar Toplamı</div>
+                    <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(accessoriesTotal)}</div>
+                  </div>
+
+                  <div style={ST.grandRow}>
+                    <div>Genel Toplam</div>
+                    <div style={{ whiteSpace: "nowrap" }}>{currency(grandTotal)}</div>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div style={ST.footerGrid}>
-                <div style={ST.notes}>
-                  {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
-                </div>
+            {/* FOOTER (sabit) */}
+            <div style={ST.footer}>
+              <div style={ST.notes}>
+                {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
+              </div>
 
-                <div style={ST.signBox}>
-                  <div style={ST.signTitle}>Müşteri İmza</div>
-                  <div style={{ height: 34, marginTop: 10 }} />
-                </div>
+              <div style={ST.signBox}>
+                <div style={ST.signTitle}>Müşteri İmza</div>
+                <div style={{ flex: 1 }} />
               </div>
             </div>
           </div>
         </div>
-
-        <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
-          <button style={ST.exportBtn} onClick={exportJpg}>JPEG Çıktı Al</button>
-        </div>
       </div>
-    );
-  }
+
+      {/* export butonu (export sırasında gizlenir) */}
+      <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
+        <button style={ST.exportBtn} onClick={exportJpg}>
+          JPEG Çıktı Al
+        </button>
+      </div>
+    </div>
+  );
+}
 
   // ---------------- ITEMS LIST DETAILS ----------------
   function itemDetailText(it) {
