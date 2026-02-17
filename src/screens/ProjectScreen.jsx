@@ -187,30 +187,33 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   }
 
   function calcHiltonPrice(data) {
-    const mat = data.material || "Lake";
-    const unit = materialPrices[mat] || 0;
+  const mat = data.material || "Lake";
+  const unit = materialPrices[mat] || 0;
 
-    const tip = data.tip || "Tip1";
-    const size = String(data.size || "80");
-    const mirrorCabinet = data.mirrorCabinet === true;
+  const tip = data.tip || "Tip1";
+  const size = String(data.size || "80");
+  const mirrorCabinet = data.mirrorCabinet === true;
 
-    let base = 1.5;
-    if (size === "60") base = 1.0;
-    if (size === "100") base = 2.0;
-    if (size === "120") base = 2.5;
+  let base = 1.5; // 80
+  if (size === "60") base = 1.0;
+  if (size === "100") base = 2.0;
+  if (size === "120") base = 2.5;
 
-    if (mirrorCabinet) base += 0.5;
-    if (tip === "Tip2" || tip === "Tip3") base += 1.0;
+  if (mirrorCabinet) base += 0.5;
+  if (tip === "Tip2" || tip === "Tip3") base += 1.0;
 
-    let extra = 0;
-    if (tip === "Tip3") {
-      extra += factorFromDims(toNum(data.wmW ?? 60), toNum(data.wmH ?? 200), toNum(data.wmD ?? 60));
-      extra += factorFromDims(toNum(data.panW ?? 45), toNum(data.panH ?? 200), toNum(data.panD ?? 60));
-    }
-
-    const factor = (base + extra) * (coeff.hilton || 1);
-    return { factor, price: factor * unit };
+  let extra = 0;
+  if (tip === "Tip3") {
+    extra += factorFromDims(toNum(data.wmW ?? 60), toNum(data.wmH ?? 200), toNum(data.wmD ?? 60));
+    extra += factorFromDims(toNum(data.panW ?? 45), toNum(data.panH ?? 200), toNum(data.panD ?? 60));
   }
+
+  // ✅ SettingsScreen'den gelen katsayı (varsayılan 2)
+  const k = Number.isFinite(Number(coeff?.hilton)) ? Number(coeff.hilton) : 2;
+
+  const factor = (base + extra) * k;
+  return { factor, price: factor * unit };
+}
 
   function calcSimplePrice(data) {
     const mat = data.material || "Lake";
