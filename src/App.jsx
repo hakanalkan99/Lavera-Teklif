@@ -21,6 +21,22 @@ function makeRouteSettings() {
   return { name: "settings" };
 }
 
+// ✅ Cloud boş gelirse uygulama açılsın diye default state
+function makeInitialState() {
+  return {
+    settings: {
+      nextProjectNumber: 2620,
+      materialPrices: { MDFLAM: 100, HGloss: 120, LakPanel: 150, Lake: 200 },
+      doorPrice: 12000,
+      skirtingPricePerMeter: 300,
+      coefficients: { hilton: 1.0, tv: 1.0, seperator: 1.0, coffee: 1.0 },
+      accessories: [],
+      companyInfo: { name: "", address: "", phone: "", email: "", logoDataUrl: "" },
+    },
+    projects: [],
+  };
+}
+
 // -----------------------------
 // App
 // -----------------------------
@@ -61,13 +77,23 @@ export default function App() {
         if (alive) setUserEmail(email);
 
         const loaded = await loadCloudState();
+
+        // ✅ kritik satır: null gelirse default state bas
+        const nextState = loaded || makeInitialState();
+
         if (alive) {
-          setState(loaded);
-          setLoading(false);
-          lastSavedHashRef.current = hashState(loaded);
+          setState(nextState);
+          lastSavedHashRef.current = hashState(nextState);
         }
       } catch (e) {
         console.error("Cloud load error:", e);
+        if (alive) {
+          // ✅ hata olsa bile app açılsın
+          const nextState = makeInitialState();
+          setState(nextState);
+          lastSavedHashRef.current = hashState(nextState);
+        }
+      } finally {
         if (alive) setLoading(false);
       }
     })();
@@ -106,7 +132,6 @@ export default function App() {
   const header = useMemo(() => {
     return (
       <>
-        {/* küçük animasyon css’i */}
         <style>{`
           @keyframes fadeInOut {
             0% { opacity: 0; transform: translateY(-6px); }
@@ -115,7 +140,7 @@ export default function App() {
             100% { opacity: 0; }
           }
 
-          /* ✅ ÇÖZÜM: header dışındaki tüm "Çıkış" butonlarını gizle */
+          /* header dışındaki tüm "Çıkış" butonlarını gizle */
           button[title="Çıkış"]:not(#header-logout),
           button[aria-label="Çıkış"]:not(#header-logout) {
             display: none !important;
@@ -139,9 +164,7 @@ export default function App() {
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 0.2 }}>
-              Lavera Teklif Sistemi
-            </div>
+            <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 0.2 }}>Lavera Teklif Sistemi</div>
             {userEmail ? (
               <div style={{ fontSize: 12, opacity: 0.8 }}>{userEmail}</div>
             ) : (
