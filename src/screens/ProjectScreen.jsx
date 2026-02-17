@@ -902,8 +902,8 @@ function OfferView() {
 
   // sabit yükseklikler
   const PAD = 22;
-  const HEADER_H = 168; // üst çerçeve + nefes
-  const FOOTER_H = 150;
+  const HEADER_H = 148; // üst çerçeve + nefes
+  const FOOTER_H = 130;
 
   const sheetRef = useRef(null);
   const middleRef = useRef(null);
@@ -1014,7 +1014,7 @@ function OfferView() {
       border: "1px solid #eef0f4",
       borderRadius: 16,
       background: "#fff",
-      padding: 14,
+      padding: 10,
       boxSizing: "border-box",
       display: "grid",
       gridTemplateColumns: "1fr 1.35fr 1fr",
@@ -1054,11 +1054,11 @@ function OfferView() {
     middle: {
       flex: 1,
       minHeight: 0,
-      paddingTop: 10,     // biraz yukarı
-      paddingBottom: 12,
+      paddingTop: 6,     // biraz yukarı
+      paddingBottom: 6,
       display: "flex",
       flexDirection: "column",
-      gap: 10,
+      gap: 6,
     },
 
     tableWrap: {
@@ -1261,7 +1261,7 @@ function OfferView() {
                 </div>
 
                 {/* TOTALS */}
-                <div style={{ marginTop: 10, ...ST.totalsBox }}>
+                <div style={{ marginTop: 6, ...ST.totalsBox }}>
                   <div style={ST.totalRow}>
                     <div>Kalemler Toplamı</div>
                     <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(itemsTotal)}</div>
