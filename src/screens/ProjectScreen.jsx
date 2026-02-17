@@ -4,8 +4,9 @@ import html2canvas from "html2canvas";
 /**
  * ProjectScreen.jsx
  * - Corporate UI
- * - Offer A4 auto-fit + logo + notes + signature + high quality JPEG export
- * - Drawer inputs: NO setState on every keystroke (fixes focus/keyboard drop on Win+mobile)
+ * - Offer A4 fixed: header + footer fixed, middle auto-fit
+ * - Drawer inputs: NO parent setState on every keystroke (fixes focus/keyboard drop on Win+mobile)
+ * - Font: NO serif anywhere (Inter/system-ui)
  */
 
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
@@ -26,6 +27,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   // Drawer state
   const [draftType, setDraftType] = useState("Mutfak");
   const [draftName, setDraftName] = useState("");
+  const draftNameRef = useRef(""); // ✅ live typing (no rerender per key)
   const [draftData, setDraftData] = useState({}); // committed data only (blur/enter)
   const draftDataRef = useRef({}); // live typing data (no rerender each key)
 
@@ -296,7 +298,13 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
   // ---------------- STYLES (Corporate / White) ----------------
   const S = {
-    page: { minHeight: "100vh", background: "#f7f8fb", color: "#0b1220", padding: 16 },
+    page: {
+      minHeight: "100vh",
+      background: "#f7f8fb",
+      color: "#0b1220",
+      padding: 16,
+      fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif', // ✅ NO serif
+    },
     container: { maxWidth: 820, margin: "0 auto" },
 
     topBar: {
@@ -385,6 +393,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       color: "#111827",
       outline: "none",
       fontWeight: 900,
+      fontFamily: "inherit", // ✅ ensure no serif in inputs
     },
     select: {
       width: "100%",
@@ -395,6 +404,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       color: "#111827",
       outline: "none",
       fontWeight: 900,
+      fontFamily: "inherit", // ✅
     },
     grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
     grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 },
@@ -412,6 +422,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       display: "flex",
       flexDirection: "column",
       boxShadow: "-20px 0 60px rgba(0,0,0,0.15)",
+      fontFamily: "inherit", // ✅
     },
     drawerHead: { padding: 14, borderBottom: "1px solid #eef1f6", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 },
     drawerBody: { padding: 14, overflow: "auto", flex: 1 },
@@ -436,6 +447,9 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   function initDraft(type) {
     const t = normalizeType(type);
     setDraftType(t);
+
+    // ✅ reset name ref + state
+    draftNameRef.current = "";
     setDraftName("");
 
     let base = {};
@@ -469,7 +483,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
       base = { w: 100, h: 100, d: 60, material: "Lake" };
     }
 
-    // Important: keep both ref + committed state in sync
+    // keep both ref + committed state in sync
     draftDataRef.current = { ...base };
     setDraftData({ ...base });
   }
@@ -482,32 +496,28 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     setDrawerOpen(false);
   }
 
-  // ---------------- INPUT COMPONENT (FIX FOCUS) ----------------
+  // ---------------- INPUT COMPONENTS (FIX FOCUS) ----------------
   /**
    * DraftInput:
    * - Local value while typing (no parent state updates on each key)
    * - Commit to parent draftData on Blur or Enter
-   * This prevents "typing 1 char -> keyboard closes" on Windows/mobile.
    */
   function DraftInput({ label, field, placeholder, numeric = false, integer = false, disabled = false }) {
     const initial = draftDataRef.current?.[field];
     const [val, setVal] = useState(initial === undefined || initial === null ? "" : String(initial));
     const mountedRef = useRef(false);
 
-    // When drawer type changes / re-init, update local
     useEffect(() => {
       const next = draftDataRef.current?.[field];
       setVal(next === undefined || next === null ? "" : String(next));
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [draftType, drawerOpen]);
 
-    // keep ref in sync while typing (still no rerender)
     useEffect(() => {
       if (!mountedRef.current) {
         mountedRef.current = true;
         return;
       }
-      // live typing into ref:
       draftDataRef.current = { ...draftDataRef.current, [field]: val };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [val]);
@@ -515,7 +525,6 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     function commit() {
       const raw = val;
       let committed = raw;
-
       if (numeric) committed = toNum(raw);
       if (integer) committed = toInt(raw);
 
@@ -537,7 +546,54 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             if (e.key === "Enter") {
               e.preventDefault();
               commit();
-              // keep focus (don’t close keyboard)
+              e.currentTarget.focus();
+            }
+          }}
+        />
+      </label>
+    );
+  }
+
+  /**
+   * DraftNameInput:
+   * - Same approach as DraftInput to prevent focus/keyboard drop while renaming
+   */
+  function DraftNameInput() {
+    const [val, setVal] = useState(draftNameRef.current || "");
+    const mountedRef = useRef(false);
+
+    useEffect(() => {
+      setVal(draftNameRef.current || "");
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draftType, drawerOpen]);
+
+    useEffect(() => {
+      if (!mountedRef.current) {
+        mountedRef.current = true;
+        return;
+      }
+      draftNameRef.current = val;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [val]);
+
+    function commit() {
+      draftNameRef.current = val;
+      setDraftName(val); // optional, keep state in sync
+    }
+
+    return (
+      <label style={{ display: "grid", gap: 6 }}>
+        <div style={S.fieldLabel}>Kalem Adı</div>
+        <input
+          style={S.input}
+          value={val}
+          placeholder={draftType}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
               e.currentTarget.focus();
             }
           }}
@@ -551,14 +607,32 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
     // commit all live ref fields into state one last time:
     const live = draftDataRef.current || {};
-    // normalize numeric fields by type (so future computations are stable)
     let data = { ...live };
 
     if (draftType === "Kapı") data.qty = toInt(live.qty);
     if (draftType === "Süpürgelik") data.m = toNum(live.m);
 
-    // For numeric dimension-based types, convert common fields
-    const numFields = ["totalWallCm","wallAcm","wallBcm","wallCcm","ceilingCm","fridgeCm","tallOvenCm","islandCm","runAltCm","tallTotalCm","wmW","wmH","wmD","panW","panH","panD","w","h","d"];
+    const numFields = [
+      "totalWallCm",
+      "wallAcm",
+      "wallBcm",
+      "wallCcm",
+      "ceilingCm",
+      "fridgeCm",
+      "tallOvenCm",
+      "islandCm",
+      "runAltCm",
+      "tallTotalCm",
+      "wmW",
+      "wmH",
+      "wmD",
+      "panW",
+      "panH",
+      "panD",
+      "w",
+      "h",
+      "d",
+    ];
     for (const k of numFields) {
       if (data[k] !== undefined && data[k] !== null && data[k] !== "" && typeof data[k] !== "number") {
         data[k] = toNum(data[k]);
@@ -566,7 +640,8 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     }
 
     updateProject((p) => {
-      const name = nextName(draftType, draftName || draftType, p.items || []);
+      const safeCustom = (draftNameRef.current || "").trim();
+      const name = nextName(draftType, safeCustom || draftType, p.items || []);
       const newItem = { id, type: draftType, name, data };
       return { ...p, items: [...(p.items || []), newItem] };
     });
@@ -634,10 +709,8 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
     return (
       <div style={{ display: "grid", gap: 12 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <div style={S.fieldLabel}>Kalem Adı</div>
-          <input style={S.input} value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={draftType} />
-        </label>
+        {/* ✅ FIX: Kalem adı da artık local typing + blur/enter commit */}
+        <DraftNameInput />
 
         <DraftMaterialPicker />
 
@@ -867,11 +940,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
             <div style={{ display: "grid", gap: 12 }}>
               <label style={{ display: "grid", gap: 6 }}>
                 <div style={S.fieldLabel}>Kalem Türü</div>
-                <select
-                  style={S.select}
-                  value={draftType}
-                  onChange={(e) => initDraft(e.target.value)}
-                >
+                <select style={S.select} value={draftType} onChange={(e) => initDraft(e.target.value)}>
                   {itemTypes.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -891,419 +960,389 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     );
   }
 
-// ---------- OFFER VIEW (A4 SABİT: antet sabit + dipnot/imza sabit + içerik ortada ölçeklenir) ----------
-function OfferView() {
-  const company = settings.companyInfo || {};
-  const logoUrl = company.logoDataUrl || "";
+  // ---------- OFFER VIEW (A4 FIXED: header + footer fixed; middle auto-fit) ----------
+  function OfferView() {
+    const company = settings.companyInfo || {};
+    const logoUrl = company.logoDataUrl || "";
 
-  // A4 px (yaklaşık, 96dpi)
-  const A4_W = 794;
-  const A4_H = 1123;
+    const A4_W = 794;
+    const A4_H = 1123;
 
-  // sabit yükseklikler
-  const PAD = 22;
-  const HEADER_H = 148; // üst çerçeve + nefes
-  const FOOTER_H = 130;
+    const PAD = 22;
+    const HEADER_H = 148;
+    const FOOTER_H = 130;
 
-  const sheetRef = useRef(null);
-  const middleRef = useRef(null);
-  const middleContentRef = useRef(null);
+    const sheetRef = useRef(null);
+    const middleRef = useRef(null);
+    const middleContentRef = useRef(null);
 
-  const [fitScale, setFitScale] = useState(1);
-  const [exporting, setExporting] = useState(false);
+    const [fitScale, setFitScale] = useState(1);
+    const [exporting, setExporting] = useState(false);
 
-  // Hilton tek satır: hesaplar
-  const hiltonPack = useMemo(() => {
-    const list = itemsComputed.filter((x) => normalizeType(x.type) === "Hilton");
-    const total = list.reduce((s, x) => s + (x._price || 0), 0);
-
-    const details = list.map((it) => {
-      const d = it.data || {};
-      const mat =
-        d.material ? materialLabel(d.material) : "Lake";
-      const tip = d.tip || "Tip1";
-      const size = d.size || "80";
-      // isim önemli değil ama açıklamada görmek iyi (istersen kaldırırız)
-      return `${it.name} • ${tip} • ${size} • ${mat}`;
-    });
-
-    return { list, total, details, has: list.length > 0 };
-  }, [itemsComputed]);
-
-  // Ortadaki içerik A4'ün ortasına sığsın diye ölçek
-  useLayoutEffect(() => {
-    const mid = middleRef.current;
-    const content = middleContentRef.current;
-    if (!mid || !content) return;
-
-    const available = mid.clientHeight;
-    const need = content.scrollHeight || content.getBoundingClientRect().height || 0;
-    if (!available || !need) return;
-
-    const s = Math.min(1, available / need);
-    setFitScale(Math.max(0.72, s));
-  }, [
-    itemsComputed.length,
-    hiltonPack.total,
-    hiltonPack.has,
-    (project?.accessories || []).length,
-    project?.customerName,
-    project?.phone,
-    project?.address,
-    company.logoDataUrl,
-    accessoriesTotal,
-    itemsTotal,
-    grandTotal,
-  ]);
-
-  async function exportJpg() {
-    try {
-      setExporting(true);
-      await new Promise((r) => setTimeout(r, 60));
-
-      const node = sheetRef.current;
-      if (!node) return;
-
-      const canvas = await html2canvas(node, {
-        backgroundColor: "#ffffff",
-        scale: 3,
-        useCORS: true,
+    const hiltonPack = useMemo(() => {
+      const list = itemsComputed.filter((x) => normalizeType(x.type) === "Hilton");
+      const total = list.reduce((s, x) => s + (x._price || 0), 0);
+      const details = list.map((it) => {
+        const d = it.data || {};
+        const mat = d.material ? materialLabel(d.material) : "Lake";
+        const tip = d.tip || "Tip1";
+        const size = d.size || "80";
+        return `${it.name} • ${tip} • ${size} • ${mat}`;
       });
+      return { list, total, details, has: list.length > 0 };
+    }, [itemsComputed]);
 
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${project?.projectNumber || "teklif"}${project?.currentVersion || "A"}-${(project?.customerName || "musteri")
-        .toString()
-        .replace(/[^\w\s-]/g, "")
-        .trim()
-        .replace(/\s+/g, "-")}.jpg`;
-      a.click();
-    } finally {
-      setExporting(false);
+    useLayoutEffect(() => {
+      const mid = middleRef.current;
+      const content = middleContentRef.current;
+      if (!mid || !content) return;
+
+      const available = mid.clientHeight;
+      const need = content.scrollHeight || content.getBoundingClientRect().height || 0;
+      if (!available || !need) return;
+
+      const s = Math.min(1, available / need);
+      setFitScale(Math.max(0.72, s));
+    }, [
+      itemsComputed.length,
+      hiltonPack.total,
+      hiltonPack.has,
+      (project?.accessories || []).length,
+      project?.customerName,
+      project?.phone,
+      project?.address,
+      company.logoDataUrl,
+      accessoriesTotal,
+      itemsTotal,
+      grandTotal,
+    ]);
+
+    async function exportJpg() {
+      try {
+        setExporting(true);
+        await new Promise((r) => setTimeout(r, 60));
+
+        const node = sheetRef.current;
+        if (!node) return;
+
+        const canvas = await html2canvas(node, {
+          backgroundColor: "#ffffff",
+          scale: 3,
+          useCORS: true,
+        });
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${project?.projectNumber || "teklif"}${project?.currentVersion || "A"}-${(project?.customerName || "musteri")
+          .toString()
+          .replace(/[^\w\s-]/g, "")
+          .trim()
+          .replace(/\s+/g, "-")}.jpg`;
+        a.click();
+      } finally {
+        setExporting(false);
+      }
     }
-  }
 
-  const F = {
-    fontFamily:
-      'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
-  };
+    const F = {
+      fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif', // ✅ no serif
+    };
 
-  const ST = {
-    shell: {
-      width: A4_W,
-      height: A4_H,
-      background: "#fff",
-      border: "1px solid #e5e7eb",
-      borderRadius: 16,
-      boxShadow: "0 12px 42px rgba(0,0,0,0.08)",
-      overflow: "hidden",
-      ...F,
-    },
-    frame: {
-      height: "100%",
-      display: "flex",
-      flexDirection: "column",
-      padding: PAD,
-      boxSizing: "border-box",
-    },
+    const ST = {
+      shell: {
+        width: A4_W,
+        height: A4_H,
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 16,
+        boxShadow: "0 12px 42px rgba(0,0,0,0.08)",
+        overflow: "hidden",
+        ...F,
+      },
+      frame: {
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        padding: PAD,
+        boxSizing: "border-box",
+      },
 
-    // HEADER FRAME (tek çerçeve)
-    headerFrame: {
-      height: HEADER_H,
-      border: "1px solid #eef0f4",
-      borderRadius: 16,
-      background: "#fff",
-      padding: 10,
-      boxSizing: "border-box",
-      display: "grid",
-      gridTemplateColumns: "1fr 1.35fr 1fr",
-      gap: 12,
-      alignItems: "center",
-    },
+      headerFrame: {
+        height: HEADER_H,
+        border: "1px solid #eef0f4",
+        borderRadius: 16,
+        background: "#fff",
+        padding: 10,
+        boxSizing: "border-box",
+        display: "grid",
+        gridTemplateColumns: "1fr 1.35fr 1fr",
+        gap: 12,
+        alignItems: "center",
+      },
 
-    // logo kare
-    logoBox: {
-      width: 82,
-      height: 82,
-      borderRadius: 14,
-      border: "1px solid #eef0f4",
-      background: "#fff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
-    },
-    logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
+      logoBox: {
+        width: 82,
+        height: 82,
+        borderRadius: 14,
+        border: "1px solid #eef0f4",
+        background: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      },
+      logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
 
-    leftCol: { display: "flex", flexDirection: "column", alignItems: "center" },
-    companyName: { fontWeight: 900, fontSize: 12.8, color: "#0f172a", marginTop: 8, textAlign: "center" },
-    companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 600, lineHeight: 1.35, textAlign: "center" },
+      leftCol: { display: "flex", flexDirection: "column", alignItems: "center" },
+      companyName: { fontWeight: 900, fontSize: 12.8, color: "#0f172a", marginTop: 8, textAlign: "center" },
+      companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 600, lineHeight: 1.35, textAlign: "center" },
 
-    // müşteri ortası gerçekten ortalı
-    centerCol: { textAlign: "center" },
-    centerTitle: { fontWeight: 900, fontSize: 15.3, color: "#0f172a" },
-    centerCustomer: { fontWeight: 850, fontSize: 12.8, color: "#334155", marginTop: 6 },
-    centerSmall: { fontSize: 10.9, color: "#475569", fontWeight: 600, marginTop: 6, lineHeight: 1.25 },
+      centerCol: { textAlign: "center" },
+      centerTitle: { fontWeight: 900, fontSize: 15.3, color: "#0f172a" },
+      centerCustomer: { fontWeight: 850, fontSize: 12.8, color: "#334155", marginTop: 6 },
+      centerSmall: { fontSize: 10.9, color: "#475569", fontWeight: 600, marginTop: 6, lineHeight: 1.25 },
 
-    rightCol: { textAlign: "right" },
-    rightTitle: { fontWeight: 900, letterSpacing: 1, fontSize: 13.2, color: "#0f172a" },
-    rightMeta: { fontSize: 10.9, color: "#475569", fontWeight: 700, marginTop: 6 },
+      rightCol: { textAlign: "right" },
+      rightTitle: { fontWeight: 900, letterSpacing: 1, fontSize: 13.2, color: "#0f172a" },
+      rightMeta: { fontSize: 10.9, color: "#475569", fontWeight: 700, marginTop: 6 },
 
-    // ORTA
-    middle: {
-      flex: 1,
-      minHeight: 0,
-      paddingTop: 6,     // biraz yukarı
-      paddingBottom: 6,
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-    },
+      middle: {
+        flex: 1,
+        minHeight: 0,
+        paddingTop: 6,
+        paddingBottom: 6,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      },
 
-    tableWrap: {
-      border: "1px solid #eef0f4",
-      borderRadius: 14,
-      overflow: "hidden",
-      background: "#fff",
-    },
-    head: {
-      display: "grid",
-      gridTemplateColumns: "1fr 170px",
-      background: "#f8fafc",
-    },
-    th: { padding: "8px 12px", fontWeight: 800, fontSize: 11.4, color: "#334155" }, // biraz yukarı
-    row: {
-      display: "grid",
-      gridTemplateColumns: "1fr 170px",
-      borderTop: "1px solid #eef0f4",
-    },
-    td: { padding: "9px 12px", fontSize: 11.5, color: "#0f172a" },
-    tdRight: {
-      padding: "9px 12px",
-      fontSize: 11.5,
-      color: "#0f172a",
-      textAlign: "right",
-      fontWeight: 900,
-      whiteSpace: "nowrap",
-    },
+      tableWrap: {
+        border: "1px solid #eef0f4",
+        borderRadius: 14,
+        overflow: "hidden",
+        background: "#fff",
+      },
+      head: {
+        display: "grid",
+        gridTemplateColumns: "1fr 170px",
+        background: "#f8fafc",
+      },
+      th: { padding: "8px 12px", fontWeight: 800, fontSize: 11.4, color: "#334155" },
+      row: {
+        display: "grid",
+        gridTemplateColumns: "1fr 170px",
+        borderTop: "1px solid #eef0f4",
+      },
+      td: { padding: "9px 12px", fontSize: 11.5, color: "#0f172a" },
+      tdRight: {
+        padding: "9px 12px",
+        fontSize: 11.5,
+        color: "#0f172a",
+        textAlign: "right",
+        fontWeight: 900,
+        whiteSpace: "nowrap",
+      },
 
-    itemName: { fontWeight: 900, fontSize: 12.1, color: "#0f172a" },
-    itemDetail: { marginTop: 3, fontSize: 10.9, color: "#475569", fontWeight: 600, lineHeight: 1.25, whiteSpace: "pre-line" },
+      itemName: { fontWeight: 900, fontSize: 12.1, color: "#0f172a" },
+      itemDetail: { marginTop: 3, fontSize: 10.9, color: "#475569", fontWeight: 600, lineHeight: 1.25, whiteSpace: "pre-line" },
 
-    totalsBox: {
-      border: "1px solid #eef0f4",
-      borderRadius: 14,
-      padding: 12,
-      background: "#fff",
-    },
-    totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#334155", fontWeight: 800, marginTop: 6 },
-    grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16.5, color: "#0f172a", fontWeight: 950, marginTop: 10 },
+      totalsBox: {
+        border: "1px solid #eef0f4",
+        borderRadius: 14,
+        padding: 12,
+        background: "#fff",
+      },
+      totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#334155", fontWeight: 800, marginTop: 6 },
+      grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16.5, color: "#0f172a", fontWeight: 950, marginTop: 10 },
 
-    // FOOTER
-    footer: {
-      height: FOOTER_H,
-      display: "grid",
-      gridTemplateColumns: "1.35fr 0.65fr",
-      gap: 12,
-      alignItems: "end",
-      paddingTop: 12,
-      borderTop: "1px solid #eef0f4",
-    },
-    notes: {
-      fontSize: 11,
-      color: "#475569",
-      fontWeight: 600,
-      lineHeight: 1.45,
-      whiteSpace: "pre-line",
-    },
-    signBox: {
-      border: "1px dashed #cbd5e1",
-      borderRadius: 14,
-      padding: 12,
-      height: 98,
-      boxSizing: "border-box",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "flex-start",
-      gap: 10,
-    },
-    signTitle: { fontSize: 11, fontWeight: 900, color: "#334155" },
+      footer: {
+        height: FOOTER_H,
+        display: "grid",
+        gridTemplateColumns: "1.35fr 0.65fr",
+        gap: 12,
+        alignItems: "end",
+        paddingTop: 12,
+        borderTop: "1px solid #eef0f4",
+      },
+      notes: {
+        fontSize: 11,
+        color: "#475569",
+        fontWeight: 600,
+        lineHeight: 1.45,
+        whiteSpace: "pre-line",
+      },
+      signBox: {
+        border: "1px dashed #cbd5e1",
+        borderRadius: 14,
+        padding: 12,
+        height: 98,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-start",
+        gap: 10,
+      },
+      signTitle: { fontSize: 11, fontWeight: 900, color: "#334155" },
 
-    actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end", paddingRight: 6 },
-    exportBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid #e5e7eb",
-      background: "#fff",
-      fontWeight: 900,
-      cursor: "pointer",
-      ...F,
-    },
-  };
+      actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end", paddingRight: 6 },
+      exportBtn: {
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid #e5e7eb",
+        background: "#fff",
+        fontWeight: 900,
+        cursor: "pointer",
+        ...F,
+      },
+    };
 
-  // Hilton harici satırları bas
-  const rowsNonHilton = itemsComputed.filter((it) => normalizeType(it.type) !== "Hilton");
+    const rowsNonHilton = itemsComputed.filter((it) => normalizeType(it.type) !== "Hilton");
 
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div ref={sheetRef} style={ST.shell}>
-          <div style={ST.frame}>
-            {/* HEADER FRAME */}
-            <div style={ST.headerFrame}>
-              <div style={ST.leftCol}>
-                <div style={ST.logoBox}>
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="logo" style={ST.logoImg} />
-                  ) : (
-                    <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>
-                  )}
+    return (
+      <div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div ref={sheetRef} style={ST.shell}>
+            <div style={ST.frame}>
+              <div style={ST.headerFrame}>
+                <div style={ST.leftCol}>
+                  <div style={ST.logoBox}>
+                    {logoUrl ? <img src={logoUrl} alt="logo" style={ST.logoImg} /> : <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>}
+                  </div>
+
+                  <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
+                  {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
+                  {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
+                  {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
                 </div>
 
-                <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
-                {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
-                {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
-                {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
-              </div>
-
-              <div style={ST.centerCol}>
-                <div style={ST.centerTitle}>{project.name}</div>
-                <div style={ST.centerCustomer}>{project.customerName}</div>
-                {(project.phone || project.address) ? (
-                  <div style={ST.centerSmall}>
-                    {project.phone ? `Tel: ${project.phone}` : ""}
-                    {project.phone && project.address ? " • " : ""}
-                    {project.address ? `Adres: ${project.address}` : ""}
-                  </div>
-                ) : null}
-              </div>
-
-              <div style={ST.rightCol}>
-                <div style={ST.rightTitle}>TEKLİF</div>
-                <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
-                <div style={ST.rightMeta}>Kod: {code}</div>
-              </div>
-            </div>
-
-            {/* MIDDLE */}
-            <div ref={middleRef} style={ST.middle}>
-              <div
-                ref={middleContentRef}
-                style={{
-                  transform: `scale(${fitScale})`,
-                  transformOrigin: "top left",
-                  width: `${100 / fitScale}%`,
-                }}
-              >
-                {/* TABLE */}
-                <div style={ST.tableWrap}>
-                  <div style={ST.head}>
-                    <div style={ST.th}>Kalem / Detay</div>
-                    <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
-                  </div>
-
-                  {/* Hilton tek satır */}
-                  {hiltonPack.has && (
-                    <div style={ST.row}>
-                      <div style={ST.td}>
-                        <div style={ST.itemName}>Hilton</div>
-                        <div style={ST.itemDetail}>
-                          {hiltonPack.details.join("\n")}
-                        </div>
-                      </div>
-                      <div style={ST.tdRight}>{currency(hiltonPack.total)}</div>
+                <div style={ST.centerCol}>
+                  <div style={ST.centerTitle}>{project.name}</div>
+                  <div style={ST.centerCustomer}>{project.customerName}</div>
+                  {project.phone || project.address ? (
+                    <div style={ST.centerSmall}>
+                      {project.phone ? `Tel: ${project.phone}` : ""}
+                      {project.phone && project.address ? " • " : ""}
+                      {project.address ? `Adres: ${project.address}` : ""}
                     </div>
-                  )}
+                  ) : null}
+                </div>
 
-                  {/* Diğer kalemler */}
-                  {rowsNonHilton.map((it) => {
-                    const t = normalizeType(it.type);
-                    const d = it.data || {};
-                    let detail = "";
+                <div style={ST.rightCol}>
+                  <div style={ST.rightTitle}>TEKLİF</div>
+                  <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
+                  <div style={ST.rightMeta}>Kod: {code}</div>
+                </div>
+              </div>
 
-                    if (t === "Kapı") detail = "Lake";
-                    else if (t === "Süpürgelik") detail = "Lake";
-                    else if (d.material) detail = materialLabel(d.material);
+              <div ref={middleRef} style={ST.middle}>
+                <div
+                  ref={middleContentRef}
+                  style={{
+                    transform: `scale(${fitScale})`,
+                    transformOrigin: "top left",
+                    width: `${100 / fitScale}%`,
+                  }}
+                >
+                  <div style={ST.tableWrap}>
+                    <div style={ST.head}>
+                      <div style={ST.th}>Kalem / Detay</div>
+                      <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
+                    </div>
 
-                    if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-
-                    return (
-                      <div key={it.id} style={ST.row}>
+                    {hiltonPack.has && (
+                      <div style={ST.row}>
                         <div style={ST.td}>
-                          <div style={ST.itemName}>{it.name}</div>
-                          {detail ? <div style={ST.itemDetail}>{detail}</div> : null}
+                          <div style={ST.itemName}>Hilton</div>
+                          <div style={ST.itemDetail}>{hiltonPack.details.join("\n")}</div>
                         </div>
-                        <div style={ST.tdRight}>{currency(it._price || 0)}</div>
+                        <div style={ST.tdRight}>{currency(hiltonPack.total)}</div>
                       </div>
-                    );
-                  })}
+                    )}
 
-                  {/* Aksesuar satırı */}
-                  {project.accessories?.length > 0 && (
-                    <div style={ST.row}>
-                      <div style={ST.td}>
-                        <div style={ST.itemName}>Aksesuarlar</div>
-                        <div style={ST.itemDetail}>
-                          {(project.accessories || [])
-                            .map((r) => {
-                              const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
-                              if (!def) return null;
-                              return `${def.name} x${r.quantity || 0}`;
-                            })
-                            .filter(Boolean)
-                            .join(" • ")}
+                    {rowsNonHilton.map((it) => {
+                      const t = normalizeType(it.type);
+                      const d = it.data || {};
+                      let detail = "";
+
+                      if (t === "Kapı") detail = "Lake";
+                      else if (t === "Süpürgelik") detail = "Lake";
+                      else if (d.material) detail = materialLabel(d.material);
+
+                      if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
+
+                      return (
+                        <div key={it.id} style={ST.row}>
+                          <div style={ST.td}>
+                            <div style={ST.itemName}>{it.name}</div>
+                            {detail ? <div style={ST.itemDetail}>{detail}</div> : null}
+                          </div>
+                          <div style={ST.tdRight}>{currency(it._price || 0)}</div>
                         </div>
+                      );
+                    })}
+
+                    {project.accessories?.length > 0 && (
+                      <div style={ST.row}>
+                        <div style={ST.td}>
+                          <div style={ST.itemName}>Aksesuarlar</div>
+                          <div style={ST.itemDetail}>
+                            {(project.accessories || [])
+                              .map((r) => {
+                                const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
+                                if (!def) return null;
+                                return `${def.name} x${r.quantity || 0}`;
+                              })
+                              .filter(Boolean)
+                              .join(" • ")}
+                          </div>
+                        </div>
+                        <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
                       </div>
-                      <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: 6, ...ST.totalsBox }}>
+                    <div style={ST.totalRow}>
+                      <div>Kalemler Toplamı</div>
+                      <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(itemsTotal)}</div>
                     </div>
-                  )}
-                </div>
 
-                {/* TOTALS */}
-                <div style={{ marginTop: 6, ...ST.totalsBox }}>
-                  <div style={ST.totalRow}>
-                    <div>Kalemler Toplamı</div>
-                    <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(itemsTotal)}</div>
-                  </div>
+                    <div style={ST.totalRow}>
+                      <div>Aksesuar Toplamı</div>
+                      <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(accessoriesTotal)}</div>
+                    </div>
 
-                  <div style={ST.totalRow}>
-                    <div>Aksesuar Toplamı</div>
-                    <div style={{ fontWeight: 900, whiteSpace: "nowrap" }}>{currency(accessoriesTotal)}</div>
-                  </div>
-
-                  <div style={ST.grandRow}>
-                    <div>Genel Toplam</div>
-                    <div style={{ whiteSpace: "nowrap" }}>{currency(grandTotal)}</div>
+                    <div style={ST.grandRow}>
+                      <div>Genel Toplam</div>
+                      <div style={{ whiteSpace: "nowrap" }}>{currency(grandTotal)}</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* FOOTER */}
-            <div style={ST.footer}>
-              <div style={ST.notes}>
-                {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
-              </div>
+              <div style={ST.footer}>
+                <div style={ST.notes}>
+                  {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
+                </div>
 
-              <div style={ST.signBox}>
-                <div style={ST.signTitle}>Müşteri İmza</div>
-                <div style={{ flex: 1 }} />
+                <div style={ST.signBox}>
+                  <div style={ST.signTitle}>Müşteri İmza</div>
+                  <div style={{ flex: 1 }} />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* export butonu (export sırasında gizlenir) */}
-      <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
-        <button style={ST.exportBtn} onClick={exportJpg}>
-          JPEG Çıktı Al
-        </button>
+        <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
+          <button style={ST.exportBtn} onClick={exportJpg}>
+            JPEG Çıktı Al
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   // ---------------- ITEMS LIST DETAILS ----------------
   function itemDetailText(it) {
