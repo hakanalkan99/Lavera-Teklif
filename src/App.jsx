@@ -115,16 +115,12 @@ export default function App() {
             100% { opacity: 0; }
           }
 
-          /*
-            ✅ FIX: Sağ altta çıkan (position: fixed) Çıkış butonunu gizle.
-            Bu buton App.jsx'te yok, muhtemelen <Screen> içinde basılıyor.
-            Header’daki buton sticky olduğu için etkilenmez.
-          */
-          button[title="Çıkış"][style*="position: fixed"],
-          button[aria-label="Çıkış"][style*="position: fixed"],
-          a[title="Çıkış"][style*="position: fixed"],
-          a[aria-label="Çıkış"][style*="position: fixed"] {
+          /* ✅ ÇÖZÜM: header dışındaki tüm "Çıkış" butonlarını gizle */
+          button[title="Çıkış"]:not(#header-logout),
+          button[aria-label="Çıkış"]:not(#header-logout) {
             display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
           }
         `}</style>
 
@@ -172,8 +168,6 @@ export default function App() {
 
             <button
               id="header-logout"
-              aria-label="Header Çıkış"
-              title="Header Çıkış"
               onClick={async () => {
                 try {
                   await supabase.auth.signOut();
@@ -189,6 +183,8 @@ export default function App() {
                 fontWeight: 800,
                 cursor: "pointer",
               }}
+              title="Çıkış"
+              aria-label="Çıkış"
             >
               Çıkış
             </button>
