@@ -82,7 +82,6 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
     const unit = materialPrices[mat] || 0;
 
     const altDepthFactor = 1.6;
-
     let runAltCm = 0;
 
     if (shape === "Duz") {
@@ -111,7 +110,6 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
     let upperFactor = 0;
     if (upperMode === "IkiKat") upperFactor = (runAltCm / 100) * 1.1 * 1.35;
     else if (upperMode === "Full") upperFactor = (runAltCm / 100) * 1.1 * 1.35;
-    else upperFactor = 0;
 
     const totalFactor = altFactor + tallFactor + upperFactor;
     return { factor: totalFactor, price: totalFactor * unit };
@@ -148,8 +146,8 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
     const size = String(data.size || "80");
     const mirrorCabinet = data.mirrorCabinet === true;
 
-    let base = 1.5; // 80
-    if (size === "60") base = 1.0; // 80'in 0.5 eksiği
+    let base = 1.5;
+    if (size === "60") base = 1.0;
     if (size === "100") base = 2.0;
     if (size === "120") base = 2.5;
 
@@ -313,8 +311,11 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
   }
 
   // ---------- UI STYLES ----------
-  const page = { minHeight: "100vh", background: "#f6f7fb" };
-  const wrap = { maxWidth: 720, margin: "0 auto", padding: 16 };
+  const FONT =
+    'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif';
+
+  const page = { minHeight: "100vh", background: "#f6f7fb", fontFamily: FONT };
+  const wrap = { maxWidth: 720, margin: "0 auto", padding: 16, fontFamily: FONT };
 
   const card = {
     border: "1px solid rgba(0,0,0,0.08)",
@@ -322,6 +323,7 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
     padding: 14,
     background: "#fff",
     boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+    fontFamily: FONT,
   };
 
   const btn = {
@@ -329,33 +331,86 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
     borderRadius: 14,
     border: "1px solid rgba(0,0,0,0.12)",
     background: "#fff",
-    fontWeight: 900,
+    fontWeight: 950,
     cursor: "pointer",
+    fontFamily: FONT,
+    fontSize: 13.5,
   };
   const btnPrimary = { ...btn, background: "#111", color: "#fff", border: "1px solid #111" };
   const btnDanger = { ...btn, borderColor: "rgba(220,38,38,0.25)", color: "#b91c1c" };
 
   const chip = (active) => ({
-    padding: "8px 10px",
+    padding: "9px 11px",
     borderRadius: 999,
     border: "1px solid rgba(0,0,0,0.12)",
     background: active ? "#111" : "#fff",
     color: active ? "#fff" : "#111",
     fontWeight: 950,
     cursor: "pointer",
-    fontSize: 12,
+    fontSize: 13,
+    fontFamily: FONT,
   });
 
   const statusPill = (active) => ({
-    padding: "7px 10px",
+    padding: "8px 11px",
     borderRadius: 999,
     border: "1px solid rgba(0,0,0,0.12)",
     background: active ? "#111" : "#fff",
     color: active ? "#fff" : "#111",
     fontWeight: 950,
     cursor: "pointer",
-    fontSize: 12,
+    fontSize: 13,
+    fontFamily: FONT,
   });
+
+  const input = {
+    width: "100%",
+    marginTop: 6,
+    padding: 12,
+    borderRadius: 14,
+    border: "1px solid rgba(0,0,0,0.14)",
+    fontWeight: 950,
+    fontFamily: FONT,
+    fontSize: 14,
+    outline: "none",
+  };
+
+  const label = { fontSize: 12.5, fontWeight: 950, color: "#111", fontFamily: FONT };
+
+  // Durum rengi (pill + nokta)
+  function statusTheme(st) {
+    if (st === "Onaylandı") return { bg: "#dcfce7", fg: "#166534", dot: "#22c55e", br: "rgba(34,197,94,0.35)" };
+    if (st === "Beklemede") return { bg: "#fef9c3", fg: "#854d0e", dot: "#eab308", br: "rgba(234,179,8,0.40)" };
+    if (st === "Revize") return { bg: "#fee2e2", fg: "#991b1b", dot: "#ef4444", br: "rgba(239,68,68,0.35)" };
+    // Teklif default
+    return { bg: "#e2e8f0", fg: "#334155", dot: "#64748b", br: "rgba(100,116,139,0.35)" };
+  }
+
+  function StatusBadge({ status }) {
+    const st = status || "Teklif";
+    const th = statusTheme(st);
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "7px 11px",
+          borderRadius: 999,
+          background: th.bg,
+          color: th.fg,
+          border: `1px solid ${th.br}`,
+          fontWeight: 950,
+          fontSize: 12.8,
+          fontFamily: FONT,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ width: 9, height: 9, borderRadius: 99, background: th.dot, display: "inline-block" }} />
+        {st}
+      </span>
+    );
+  }
 
   const statuses = ["Teklif", "Beklemede", "Onaylandı", "Revize"];
 
@@ -363,7 +418,7 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
     <div style={page}>
       <div style={wrap}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div style={{ fontWeight: 950, fontSize: 16 }}>Projeler</div>
+          <div style={{ fontWeight: 950, fontSize: 17, letterSpacing: 0.2, fontFamily: FONT }}>Projeler</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button style={btn} onClick={goSettings}>
               Ayarlar
@@ -377,10 +432,12 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
         {/* ONAYLANAN CİRO */}
         <div style={{ ...card, marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <div>
-            <div style={{ fontWeight: 950 }}>Onaylanan Ciro</div>
-            <div style={{ fontSize: 12, color: "#666", fontWeight: 800 }}>Sadece “Onaylandı” durumundakiler</div>
+            <div style={{ fontWeight: 950, fontSize: 15.5, fontFamily: FONT }}>Onaylanan Ciro</div>
+            <div style={{ fontSize: 13, color: "#667085", fontWeight: 850, marginTop: 4, fontFamily: FONT }}>
+              Sadece “Onaylandı” durumundakiler
+            </div>
           </div>
-          <div style={{ fontWeight: 950, fontSize: 18 }}>{currency(approvedRevenue)}</div>
+          <div style={{ fontWeight: 950, fontSize: 19, fontFamily: FONT }}>{currency(approvedRevenue)}</div>
         </div>
 
         {/* DURUM FİLTRE SEKME */}
@@ -398,8 +455,10 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
         <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
           {filteredProjects.length === 0 ? (
             <div style={card}>
-              <div style={{ fontWeight: 950 }}>Henüz proje yok</div>
-              <div style={{ marginTop: 6, color: "#666", fontWeight: 800, fontSize: 13 }}>“+ Yeni Proje” ile ilk teklifi oluştur.</div>
+              <div style={{ fontWeight: 950, fontSize: 15.5, fontFamily: FONT }}>Henüz proje yok</div>
+              <div style={{ marginTop: 6, color: "#667085", fontWeight: 850, fontSize: 13.5, fontFamily: FONT }}>
+                “+ Yeni Proje” ile ilk teklifi oluştur.
+              </div>
             </div>
           ) : (
             filteredProjects.map((p) => {
@@ -408,15 +467,20 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
 
               return (
                 <div key={p.id} style={card}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ fontWeight: 950, fontSize: 15.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: FONT }}>
+                          {p.name}
+                        </div>
+                        <StatusBadge status={st} />
+                      </div>
 
-                      <div style={{ fontSize: 12, color: "#666", fontWeight: 800, lineHeight: 1.5 }}>
-                        {p.customerName}
+                      <div style={{ fontSize: 13, color: "#667085", fontWeight: 850, lineHeight: 1.55, marginTop: 6, fontFamily: FONT }}>
+                        <div style={{ fontWeight: 950, color: "#111", fontFamily: FONT }}>{p.customerName}</div>
                         {p.phone ? <div>Tel: {p.phone}</div> : null}
                         {p.address ? <div>Adres: {p.address}</div> : null}
-                        <div style={{ marginTop: 4 }}>
+                        <div style={{ marginTop: 6 }}>
                           {formatDate(p.createdAtISO)} • Kod: <b>{p.projectNumber}{p.currentVersion}</b>
                         </div>
                         <div>
@@ -425,7 +489,7 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
                       </div>
 
                       {/* DURUM DEĞİŞTİR */}
-                      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {statuses.map((x) => (
                           <button key={x} style={statusPill(st === x)} onClick={() => setStatus(p.id, x)}>
                             {x}
@@ -435,15 +499,15 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
                     </div>
 
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 950 }}>{currency(total)}</div>
-                      <div style={{ fontSize: 12, color: "#666", fontWeight: 800 }}>Toplam</div>
-                      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 950, color: st === "Onaylandı" ? "#047857" : "#111" }}>
-                        Durum: {st}
+                      <div style={{ fontWeight: 950, fontSize: 16, fontFamily: FONT }}>{currency(total)}</div>
+                      <div style={{ fontSize: 13, color: "#667085", fontWeight: 850, marginTop: 3, fontFamily: FONT }}>Toplam</div>
+                      <div style={{ marginTop: 10 }}>
+                        <StatusBadge status={st} />
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
                     <button style={btnPrimary} onClick={() => openProject(p.id)}>
                       Aç
                     </button>
@@ -472,6 +536,7 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
             justifyContent: "center",
             alignItems: "flex-end",
             zIndex: 50,
+            fontFamily: FONT,
           }}
           onClick={() => setDrawerOpen(false)}
         >
@@ -484,83 +549,36 @@ export default function ProjectsScreen({ state, setState, goSettings, openProjec
               borderTopRightRadius: 22,
               padding: 14,
               boxShadow: "0 -16px 50px rgba(0,0,0,0.25)",
+              fontFamily: FONT,
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <div style={{ fontWeight: 950 }}>Yeni Proje</div>
+              <div style={{ fontWeight: 950, fontSize: 15.5, fontFamily: FONT }}>Yeni Proje</div>
               <button style={btn} onClick={() => setDrawerOpen(false)}>
                 Kapat
               </button>
             </div>
 
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              <label style={{ fontSize: 12, fontWeight: 900, color: "#333" }}>
+            <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+              <label style={label}>
                 Proje adı
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Örn: Çivril Villa"
-                  style={{
-                    width: "100%",
-                    marginTop: 6,
-                    padding: 12,
-                    borderRadius: 14,
-                    border: "1px solid rgba(0,0,0,0.14)",
-                    fontWeight: 900,
-                  }}
-                />
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Örn: Çivril Villa" style={input} />
               </label>
 
-              <label style={{ fontSize: 12, fontWeight: 900, color: "#333" }}>
+              <label style={label}>
                 Müşteri adı
-                <input
-                  value={customer}
-                  onChange={(e) => setCustomer(e.target.value)}
-                  placeholder="Örn: Ahmet Yılmaz"
-                  style={{
-                    width: "100%",
-                    marginTop: 6,
-                    padding: 12,
-                    borderRadius: 14,
-                    border: "1px solid rgba(0,0,0,0.14)",
-                    fontWeight: 900,
-                  }}
-                />
+                <input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Örn: Ahmet Yılmaz" style={input} />
               </label>
 
-              <label style={{ fontSize: 12, fontWeight: 900, color: "#333" }}>
+              <label style={label}>
                 Telefon (opsiyonel)
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="05xx..."
-                  style={{
-                    width: "100%",
-                    marginTop: 6,
-                    padding: 12,
-                    borderRadius: 14,
-                    border: "1px solid rgba(0,0,0,0.14)",
-                    fontWeight: 900,
-                  }}
-                />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="05xx..." style={input} />
               </label>
 
-              <label style={{ fontSize: 12, fontWeight: 900, color: "#333" }}>
+              <label style={label}>
                 Adres (opsiyonel)
-                <input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Mahalle / Sokak / İlçe..."
-                  style={{
-                    width: "100%",
-                    marginTop: 6,
-                    padding: 12,
-                    borderRadius: 14,
-                    border: "1px solid rgba(0,0,0,0.14)",
-                    fontWeight: 900,
-                  }}
-                />
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Mahalle / Sokak / İlçe..." style={input} />
               </label>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
