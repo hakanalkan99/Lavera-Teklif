@@ -1,657 +1,17 @@
-import React, { useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import html2canvas from "html2canvas";
 
-/* -----------------------------
-   Helpers (pure)
------------------------------ */
-function nowISO() {
-  return new Date().toISOString();
-}
-function formatDate(iso) {
-  try {
-    const d = new Date(iso);
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = d.getFullYear();
-    return `${dd}.${mm}.${yy}`;
-  } catch {
-    return "";
-  }
-}
-function toNum(v) {
-  const n = Number(String(v ?? "").replace(",", ".").replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
-function roundUpThousands(n) {
-  const x = Number(n || 0);
-  return Math.ceil(x / 1000) * 1000;
-}
-function currency(n) {
-  try {
-    return new Intl.NumberFormat("tr-TR", {
-      style: "currency",
-      currency: "TRY",
-      maximumFractionDigits: 0,
-    }).format(Number(n || 0));
-  } catch {
-    return `${Math.round(Number(n || 0))} ₺`;
-  }
-}
-function normalizeType(t) {
-  const x = String(t || "").toLowerCase().trim();
-  if (x.includes("mutfak") || x.includes("kitchen")) return "Mutfak";
-  if (x.includes("kahve") || x.includes("coffee")) return "Kahve Köşesi";
-  if (x.includes("hilton")) return "Hilton";
-  if (x.includes("seper") || x.includes("separat") || x.includes("divider")) return "Seperatör";
-  if (x.includes("tv")) return "TV Ünitesi";
-  if (x.includes("kapı") || x.includes("kapi") || x.includes("door")) return "Kapı";
-  if (x.includes("süpür") || x.includes("supur") || x.includes("skirting")) return "Süpürgelik";
-  if (x.includes("sade") || x.includes("other") || x.includes("custom")) return "Sade Kalem";
-  return t || "Sade Kalem";
-}
-function materialLabel(m) {
-  if (m === "MDFLAM") return "MDFLAM";
-  if (m === "HGloss") return "High Gloss";
-  if (m === "LakPanel") return "Lak Panel";
-  return "Lake";
-}
-function uid() {
-  return (crypto?.randomUUID && crypto.randomUUID()) || String(Date.now() + Math.random());
-}
-function factorFromDims(widthCm, heightCm, depthCm) {
-  const w = Math.max(0, widthCm) / 100;
-  const h = Math.max(0, heightCm) / 100;
-  const d = Math.max(0, depthCm) / 100;
-  return w * h * (1 + d);
-}
+/**
+ * ProjectScreen.jsx
+ * - Corporate UI
+ * - Offer A4 auto-fit + logo + notes + signature + high quality JPEG export
+ * - Drawer inputs: NO setState on every keystroke (fixes focus/keyboard drop on Win+mobile)
+ */
 
-/* -----------------------------
-   Draft defaults (string-based to preserve focus)
------------------------------ */
-function makeDraftDefaults(typeNorm) {
-  const t = normalizeType(typeNorm);
-  if (t === "Mutfak") {
-    return {
-      shape: "Duz",
-      totalWallCm: "600",
-      wallAcm: "400",
-      wallBcm: "500",
-      wallCcm: "300",
-      ceilingCm: "260",
-      fridgeCm: "90",
-      tallOvenCm: "60",
-      islandCm: "0",
-      upperMode: "IkiKat",
-      material: "Lake",
-    };
-  }
-  if (t === "Kahve Köşesi") {
-    return {
-      runAltCm: "120",
-      ceilingCm: "260",
-      tallTotalCm: "0",
-      hasUpper: true,
-      hasBazali: false,
-      material: "Lake",
-    };
-  }
-  if (t === "Hilton") {
-    return {
-      tip: "Tip1",
-      size: "80",
-      mirrorCabinet: false,
-      wmW: "60",
-      wmH: "200",
-      wmD: "60",
-      panW: "45",
-      panH: "200",
-      panD: "60",
-      material: "Lake",
-    };
-  }
-  if (t === "Seperatör") return { w: "100", h: "250", d: "10", material: "Lake" };
-  if (t === "TV Ünitesi") return { w: "300", h: "250", d: "40", material: "Lake" };
-  if (t === "Kapı") return { qty: "1" };
-  if (t === "Süpürgelik") return { m: "10" };
-  return { w: "100", h: "100", d: "60", material: "Lake" };
-}
-
-/* -----------------------------
-   DraftForm (STABLE COMPONENT)
-   -> DO NOT define inside ProjectScreen
------------------------------ */
-function DraftForm({
-  S,
-  draftType,
-  draftName,
-  setDraftName,
-  draftData,
-  setDraftData,
-  computePreviewPrice,
-}) {
-  const t = draftType;
-  const d = draftData || {};
-
-  // stable input setter (prevents remount / focus loss)
-  const setField = useCallback(
-    (key) => (e) => {
-      const v = e?.target?.value ?? "";
-      setDraftData((prev) => ({ ...(prev || {}), [key]: v }));
-    },
-    [setDraftData]
-  );
-
-  const setBool = useCallback(
-    (key, truthyValue = "Evet") => (e) => {
-      const v = e.target.value;
-      setDraftData((prev) => ({ ...(prev || {}), [key]: v === truthyValue }));
-    },
-    [setDraftData]
-  );
-
-  const setSelect = useCallback(
-    (key) => (e) => setDraftData((prev) => ({ ...(prev || {}), [key]: e.target.value })),
-    [setDraftData]
-  );
-
-  const showMaterial = t !== "Kapı" && t !== "Süpürgelik";
-
-  return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div>
-        <div style={S.mini}>Kalem Adı (istersen değiştir)</div>
-        <input style={S.input} value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={t} />
-      </div>
-
-      {showMaterial && (
-        <div>
-          <div style={S.mini}>Malzeme</div>
-          <select style={S.select} value={d.material || "Lake"} onChange={setSelect("material")}>
-            <option value="MDFLAM">MDFLAM</option>
-            <option value="HGloss">High Gloss</option>
-            <option value="LakPanel">Lak Panel</option>
-            <option value="Lake">Lake</option>
-          </select>
-        </div>
-      )}
-
-      {/* MUTFAK */}
-      {t === "Mutfak" && (
-        <>
-          <div style={S.grid2}>
-            <div>
-              <div style={S.mini}>Şekil</div>
-              <select style={S.select} value={d.shape || "Duz"} onChange={setSelect("shape")}>
-                <option value="Duz">Düz</option>
-                <option value="L">L</option>
-                <option value="U">U</option>
-              </select>
-            </div>
-            <div>
-              <div style={S.mini}>Tavan (cm)</div>
-              <input style={S.input} value={d.ceilingCm ?? ""} onChange={setField("ceilingCm")} inputMode="numeric" />
-            </div>
-          </div>
-
-          {String(d.shape || "Duz") === "Duz" && (
-            <div>
-              <div style={S.mini}>Toplam duvar (cm)</div>
-              <input style={S.input} value={d.totalWallCm ?? ""} onChange={setField("totalWallCm")} inputMode="numeric" />
-            </div>
-          )}
-
-          {(String(d.shape || "Duz") === "L" || String(d.shape || "Duz") === "U") && (
-            <div style={S.grid3}>
-              <div>
-                <div style={S.mini}>Duvar A (cm)</div>
-                <input style={S.input} value={d.wallAcm ?? ""} onChange={setField("wallAcm")} inputMode="numeric" />
-              </div>
-              <div>
-                <div style={S.mini}>Duvar B (cm)</div>
-                <input style={S.input} value={d.wallBcm ?? ""} onChange={setField("wallBcm")} inputMode="numeric" />
-              </div>
-              <div>
-                <div style={S.mini}>Duvar C (cm)</div>
-                <input
-                  style={S.input}
-                  value={d.wallCcm ?? ""}
-                  onChange={setField("wallCcm")}
-                  inputMode="numeric"
-                  disabled={String(d.shape || "Duz") !== "U"}
-                />
-              </div>
-            </div>
-          )}
-
-          <div style={S.grid3}>
-            <div>
-              <div style={S.mini}>Buzdolabı (cm)</div>
-              <input style={S.input} value={d.fridgeCm ?? ""} onChange={setField("fridgeCm")} inputMode="numeric" />
-            </div>
-            <div>
-              <div style={S.mini}>Boy ankastre (cm)</div>
-              <input style={S.input} value={d.tallOvenCm ?? ""} onChange={setField("tallOvenCm")} inputMode="numeric" />
-            </div>
-            <div>
-              <div style={S.mini}>Ada (cm)</div>
-              <input style={S.input} value={d.islandCm ?? ""} onChange={setField("islandCm")} inputMode="numeric" />
-            </div>
-          </div>
-
-          <div>
-            <div style={S.mini}>Üst dolap modu</div>
-            <select style={S.select} value={d.upperMode || "IkiKat"} onChange={setSelect("upperMode")}>
-              <option value="IkiKat">2 Katman (70 + 40)</option>
-              <option value="Full">Full</option>
-              <option value="Yok">Yok / Raf</option>
-            </select>
-          </div>
-        </>
-      )}
-
-      {/* KAHVE */}
-      {t === "Kahve Köşesi" && (
-        <>
-          <div style={S.grid2}>
-            <div>
-              <div style={S.mini}>Alt dolap eni (cm)</div>
-              <input style={S.input} value={d.runAltCm ?? ""} onChange={setField("runAltCm")} inputMode="numeric" />
-            </div>
-            <div>
-              <div style={S.mini}>Tavan (cm)</div>
-              <input style={S.input} value={d.ceilingCm ?? ""} onChange={setField("ceilingCm")} inputMode="numeric" />
-            </div>
-          </div>
-
-          <div style={S.grid2}>
-            <div>
-              <div style={S.mini}>Boy dolap toplam eni (cm)</div>
-              <input style={S.input} value={d.tallTotalCm ?? ""} onChange={setField("tallTotalCm")} inputMode="numeric" />
-            </div>
-            <div>
-              <div style={S.mini}>Üst dolap</div>
-              <select style={S.select} value={d.hasUpper ? "Evet" : "Hayır"} onChange={setBool("hasUpper")}>
-                <option value="Evet">Var</option>
-                <option value="Hayır">Yok</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <div style={S.mini}>Bazalı üst dolap</div>
-            <select style={S.select} value={d.hasBazali ? "Evet" : "Hayır"} onChange={setBool("hasBazali")}>
-              <option value="Hayır">Yok</option>
-              <option value="Evet">Var</option>
-            </select>
-          </div>
-        </>
-      )}
-
-      {/* HILTON */}
-      {t === "Hilton" && (
-        <>
-          <div style={S.grid2}>
-            <div>
-              <div style={S.mini}>Tip</div>
-              <select style={S.select} value={d.tip || "Tip1"} onChange={setSelect("tip")}>
-                <option value="Tip1">Tip 1</option>
-                <option value="Tip2">Tip 2</option>
-                <option value="Tip3">Tip 3</option>
-              </select>
-            </div>
-            <div>
-              <div style={S.mini}>Lavabo</div>
-              <select style={S.select} value={String(d.size || "80")} onChange={setSelect("size")}>
-                <option value="60">60</option>
-                <option value="80">80</option>
-                <option value="100">100</option>
-                <option value="120">120</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <div style={S.mini}>Ayna dolap</div>
-            <select style={S.select} value={d.mirrorCabinet ? "Evet" : "Hayır"} onChange={setBool("mirrorCabinet")}>
-              <option value="Hayır">Yok</option>
-              <option value="Evet">Var</option>
-            </select>
-          </div>
-
-          {String(d.tip || "Tip1") === "Tip3" && (
-            <>
-              <div style={S.mini}>Çamaşır kabini (cm)</div>
-              <div style={S.grid3}>
-                <input style={S.input} value={d.wmW ?? ""} onChange={setField("wmW")} placeholder="En" inputMode="numeric" />
-                <input style={S.input} value={d.wmH ?? ""} onChange={setField("wmH")} placeholder="Boy" inputMode="numeric" />
-                <input style={S.input} value={d.wmD ?? ""} onChange={setField("wmD")} placeholder="Derinlik" inputMode="numeric" />
-              </div>
-
-              <div style={S.mini}>Kiler dolabı (cm)</div>
-              <div style={S.grid3}>
-                <input style={S.input} value={d.panW ?? ""} onChange={setField("panW")} placeholder="En" inputMode="numeric" />
-                <input style={S.input} value={d.panH ?? ""} onChange={setField("panH")} placeholder="Boy" inputMode="numeric" />
-                <input style={S.input} value={d.panD ?? ""} onChange={setField("panD")} placeholder="Derinlik" inputMode="numeric" />
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {/* TV / SEPER / SADE */}
-      {(t === "TV Ünitesi" || t === "Seperatör" || t === "Sade Kalem") && (
-        <>
-          <div style={S.mini}>Ölçüler (cm)</div>
-          <div style={S.grid3}>
-            <input style={S.input} value={d.w ?? ""} onChange={setField("w")} placeholder="En" inputMode="numeric" />
-            <input style={S.input} value={d.h ?? ""} onChange={setField("h")} placeholder="Boy" inputMode="numeric" />
-            <input style={S.input} value={d.d ?? ""} onChange={setField("d")} placeholder="Derinlik" inputMode="numeric" />
-          </div>
-        </>
-      )}
-
-      {/* KAPI */}
-      {t === "Kapı" && (
-        <>
-          <div style={S.mini}>Adet</div>
-          <input style={S.input} value={d.qty ?? ""} onChange={setField("qty")} inputMode="numeric" />
-          <div style={S.mini}>Detay: Lake</div>
-        </>
-      )}
-
-      {/* SÜPÜR */}
-      {t === "Süpürgelik" && (
-        <>
-          <div style={S.mini}>Metre</div>
-          <input style={S.input} value={d.m ?? ""} onChange={setField("m")} inputMode="numeric" />
-          <div style={S.mini}>Detay: Lake</div>
-        </>
-      )}
-
-      {/* PREVIEW */}
-      <div style={{ ...S.preview, background: "#f8fafc" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div style={{ fontWeight: 900, color: "#0f172a" }}>Ön İzleme</div>
-          <div style={{ fontWeight: 950 }}>{currency(computePreviewPrice())}</div>
-        </div>
-        <div style={S.mini}>
-          {t === "Kapı"
-            ? "Malzeme: Lake"
-            : t === "Süpürgelik"
-            ? "Malzeme: Lake"
-            : `Malzeme: ${materialLabel(d.material || "Lake")}`}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* -----------------------------
-   OfferView (unchanged logic, clean & stable)
------------------------------ */
-function OfferView({
-  settings,
-  project,
-  itemsComputed,
-  accessoriesDefs,
-  itemsTotal,
-  accessoriesTotal,
-  grandTotal,
-}) {
-  const company = settings.companyInfo || {};
-  const logoUrl = company.logoDataUrl || "";
-  const offerDate = project?.offerDateISO || project?.createdAtISO || nowISO();
-  const code = `${project?.projectNumber || ""}${project?.currentVersion || "A"}`;
-
-  // A4 px approx
-  const A4_W = 794;
-  const A4_H = 1123;
-
-  const sheetRef = useRef(null);
-  const contentRef = useRef(null);
-  const [fitScale, setFitScale] = useState(1);
-  const [exporting, setExporting] = useState(false);
-
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const h = el.scrollHeight || el.getBoundingClientRect().height || 0;
-    if (!h) return;
-    const s = Math.min(1, A4_H / h);
-    setFitScale(Math.max(0.78, s));
-  }, [itemsComputed.length, (project?.accessories || []).length, company.logoDataUrl, project?.customerName, project?.phone, project?.address]);
-
-  const exportJpg = useCallback(async () => {
-    try {
-      setExporting(true);
-      await new Promise((r) => setTimeout(r, 60));
-      const node = sheetRef.current;
-      if (!node) return;
-
-      const canvas = await html2canvas(node, {
-        backgroundColor: "#ffffff",
-        scale: 3,
-        useCORS: true,
-      });
-
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${project?.projectNumber || "teklif"}${project?.currentVersion || "A"}-${project?.customerName || "musteri"}.jpg`;
-      a.click();
-    } finally {
-      setExporting(false);
-    }
-  }, [project?.projectNumber, project?.currentVersion, project?.customerName]);
-
-  const ST = {
-    shell: {
-      width: A4_W,
-      minHeight: A4_H,
-      background: "#fff",
-      border: "1px solid #e5e7eb",
-      borderRadius: 18,
-      boxShadow: "0 14px 45px rgba(0,0,0,0.08)",
-      overflow: "hidden",
-    },
-    pad: { padding: 20 },
-    headerGrid: {
-      display: "grid",
-      gridTemplateColumns: "1.2fr 1.1fr 0.9fr",
-      gap: 14,
-      alignItems: "start",
-    },
-    logoBox: {
-      width: 120,
-      height: 56,
-      borderRadius: 12,
-      border: "1px solid #eef0f4",
-      background: "#fff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
-    },
-    logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
-    companyName: { fontWeight: 950, fontSize: 13, color: "#0f172a" },
-    companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 700, lineHeight: 1.45 },
-
-    midTitle: { fontWeight: 950, fontSize: 15, color: "#0f172a", textAlign: "center", marginTop: 2 },
-    midCustomer: { fontWeight: 900, fontSize: 12, color: "#334155", textAlign: "center", marginTop: 4 },
-    midSmall: { fontSize: 10.8, color: "#475569", fontWeight: 700, textAlign: "center", marginTop: 4 },
-
-    rightTitle: { fontWeight: 950, letterSpacing: 1, fontSize: 13, color: "#0f172a", textAlign: "right" },
-    rightMeta: { fontSize: 10.8, color: "#475569", fontWeight: 800, textAlign: "right", marginTop: 4 },
-
-    divider: { marginTop: 12, borderTop: "1px solid #eef0f4" },
-
-    tableWrap: { marginTop: 12, border: "1px solid #eef0f4", borderRadius: 14, overflow: "hidden" },
-    head: { display: "grid", gridTemplateColumns: "1fr 160px", background: "#f8fafc" },
-    th: { padding: 10, fontWeight: 900, fontSize: 11, color: "#334155" },
-    row: { display: "grid", gridTemplateColumns: "1fr 160px", borderTop: "1px solid #eef0f4" },
-    td: { padding: 10, fontSize: 11, color: "#0f172a" },
-    tdRight: { padding: 10, fontSize: 11, color: "#0f172a", textAlign: "right", fontWeight: 950 },
-
-    totals: { marginTop: 12, display: "grid", gap: 6 },
-    totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "#334155", fontWeight: 800 },
-    grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 950, color: "#0f172a", marginTop: 2 },
-
-    footerGrid: { marginTop: 14, display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: 12, alignItems: "end" },
-    notes: { fontSize: 10.6, color: "#475569", fontWeight: 700, lineHeight: 1.45, whiteSpace: "pre-line" },
-    signBox: { border: "1px dashed #cbd5e1", borderRadius: 14, padding: 12, minHeight: 70 },
-    signTitle: { fontSize: 10.6, fontWeight: 900, color: "#334155" },
-
-    actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end" },
-    exportBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: "1px solid #e5e7eb",
-      background: "#fff",
-      fontWeight: 900,
-      cursor: "pointer",
-    },
-  };
-
-  const accessoriesLine = (project.accessories || [])
-    .map((r) => {
-      const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
-      if (!def) return null;
-      return `${def.name} x${r.quantity || 0}`;
-    })
-    .filter(Boolean)
-    .join(" • ");
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div ref={sheetRef} style={ST.shell}>
-          <div
-            ref={contentRef}
-            style={{
-              ...ST.pad,
-              transform: `scale(${fitScale})`,
-              transformOrigin: "top left",
-              width: A4_W / fitScale,
-            }}
-          >
-            <div style={ST.headerGrid}>
-              <div>
-                <div style={ST.logoBox}>
-                  {logoUrl ? <img src={logoUrl} alt="logo" style={ST.logoImg} /> : <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 900 }}>LOGO</div>}
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
-                  {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
-                  {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
-                  {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
-                </div>
-              </div>
-
-              <div>
-                <div style={ST.midTitle}>{project.name}</div>
-                <div style={ST.midCustomer}>{project.customerName}</div>
-                {(project.phone || project.address) ? (
-                  <div style={ST.midSmall}>
-                    {project.phone ? `Tel: ${project.phone}` : ""}
-                    {project.phone && project.address ? " • " : ""}
-                    {project.address ? `Adres: ${project.address}` : ""}
-                  </div>
-                ) : null}
-              </div>
-
-              <div>
-                <div style={ST.rightTitle}>TEKLİF</div>
-                <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
-                <div style={ST.rightMeta}>Kod: {code}</div>
-              </div>
-            </div>
-
-            <div style={ST.divider} />
-
-            <div style={ST.tableWrap}>
-              <div style={ST.head}>
-                <div style={ST.th}>Kalem / Detay</div>
-                <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
-              </div>
-
-              {itemsComputed.map((it) => {
-                const t = normalizeType(it.type);
-                const d = it.data || {};
-                let detail = "";
-
-                if (t === "Kapı") detail = "Lake";
-                else if (t === "Süpürgelik") detail = "Lake";
-                else if (d.material) detail = materialLabel(d.material);
-
-                if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-                if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
-
-                return (
-                  <div key={it.id} style={ST.row}>
-                    <div style={ST.td}>
-                      <div style={{ fontWeight: 950, fontSize: 11.6 }}>{it.name}</div>
-                      {detail ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>{detail}</div> : null}
-                    </div>
-                    <div style={ST.tdRight}>{currency(it._price || 0)}</div>
-                  </div>
-                );
-              })}
-
-              {(project.accessories || []).length > 0 && (
-                <div style={ST.row}>
-                  <div style={ST.td}>
-                    <div style={{ fontWeight: 950, fontSize: 11.6 }}>Aksesuarlar</div>
-                    {accessoriesLine ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 700, marginTop: 2 }}>{accessoriesLine}</div> : null}
-                  </div>
-                  <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
-                </div>
-              )}
-            </div>
-
-            <div style={ST.totals}>
-              <div style={ST.totalRow}>
-                <div>Kalemler Toplamı</div>
-                <div>{currency(itemsTotal)}</div>
-              </div>
-              <div style={ST.totalRow}>
-                <div>Aksesuar Toplamı</div>
-                <div>{currency(accessoriesTotal)}</div>
-              </div>
-              <div style={ST.grandRow}>
-                <div>Genel Toplam</div>
-                <div>{currency(grandTotal)}</div>
-              </div>
-            </div>
-
-            <div style={ST.footerGrid}>
-              <div style={ST.notes}>
-                {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
-              </div>
-              <div style={ST.signBox}>
-                <div style={ST.signTitle}>Müşteri İmza</div>
-                <div style={{ height: 34, marginTop: 10 }} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
-        <button style={ST.exportBtn} onClick={exportJpg}>
-          JPEG Çıktı Al
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* -----------------------------
-   MAIN SCREEN
------------------------------ */
 export default function ProjectScreen({ projectId, state, setState, onBack }) {
-  const project = state.projects.find((p) => p.id === projectId);
+  const project = (state.projects || []).find((p) => p.id === projectId);
 
-  // SETTINGS
+  // ---------------- SETTINGS ----------------
   const settings = state?.settings || {};
   const materialPrices = settings.materialPrices || { MDFLAM: 100, HGloss: 120, LakPanel: 150, Lake: 200 };
   const coeff = settings.coefficients || { hilton: 1.0, tv: 1.0, seperator: 1.0, coffee: 1.0 };
@@ -659,92 +19,110 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const doorUnit = settings.doorPrice ?? 12000;
   const skirtingUnit = settings.skirtingPricePerMeter ?? 300;
 
-  // UI
+  // ---------------- UI STATE ----------------
   const [tab, setTab] = useState("kalemler");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Drawer state
   const [draftType, setDraftType] = useState("Mutfak");
   const [draftName, setDraftName] = useState("");
-  const [draftData, setDraftData] = useState(makeDraftDefaults("Mutfak"));
+  const [draftData, setDraftData] = useState({}); // committed data only (blur/enter)
+  const draftDataRef = useRef({}); // live typing data (no rerender each key)
 
-  const itemTypes = ["Mutfak", "Kahve Köşesi", "Hilton", "Sade Kalem", "Seperatör", "TV Ünitesi", "Kapı", "Süpürgelik"];
-
-  // Styles (same concept, slightly cleaner)
-  const S = {
-    page: { minHeight: "100vh", background: "#f6f7fb", color: "#0f172a", padding: 16 },
-    container: { maxWidth: 760, margin: "0 auto" },
-    topRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
-    title: { fontWeight: 950, fontSize: 16 },
-    btn: { padding: "10px 12px", borderRadius: 12, border: "1px solid #e5e7eb", background: "#fff", fontWeight: 900, cursor: "pointer" },
-    btnPrimary: { padding: "10px 12px", borderRadius: 12, border: 0, background: "#111827", color: "#fff", fontWeight: 950, cursor: "pointer" },
-    tabs: { display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" },
-    tab: (a) => ({ padding: "10px 12px", borderRadius: 999, border: "1px solid #e5e7eb", background: a ? "#111827" : "#fff", color: a ? "#fff" : "#111827", fontWeight: 950, cursor: "pointer" }),
-
-    card: { marginTop: 12, borderRadius: 18, border: "1px solid #e5e7eb", background: "#fff", boxShadow: "0 10px 30px rgba(0,0,0,0.05)" },
-    cardBody: { padding: 14 },
-
-    box: { borderRadius: 16, border: "1px solid #eef0f4", padding: 12, background: "#fff" },
-    mini: { fontSize: 12, color: "#6b7280", fontWeight: 700, lineHeight: 1.35 },
-
-    input: { width: "100%", padding: 11, borderRadius: 12, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", outline: "none", fontWeight: 900 },
-    select: { width: "100%", padding: 11, borderRadius: 12, border: "1px solid #e5e7eb", background: "#fff", color: "#111827", outline: "none", fontWeight: 900 },
-
-    grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
-    grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 },
-
-    drawerBack: { position: "fixed", inset: 0, background: "rgba(15,23,42,0.35)", zIndex: 50 },
-    drawer: { position: "fixed", top: 0, right: 0, height: "100vh", width: "min(520px, 92vw)", background: "#fff", borderLeft: "1px solid #e5e7eb", zIndex: 60, display: "flex", flexDirection: "column" },
-    drawerHead: { padding: 14, borderBottom: "1px solid #eef0f4", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 },
-    drawerBody: { padding: 14, overflow: "auto", flex: 1 },
-    drawerFoot: { padding: 14, borderTop: "1px solid #eef0f4", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
-
-    preview: { borderRadius: 14, border: "1px solid #eef0f4", padding: 12 },
-
-    dangerBtn: { padding: "10px 12px", borderRadius: 12, border: "1px solid #fee2e2", background: "#fff", color: "#b91c1c", fontWeight: 950, cursor: "pointer" },
-  };
-
-  if (!project) {
-    return (
-      <div style={{ padding: 16 }}>
-        <button onClick={onBack}>← Geri</button>
-        <p>Proje bulunamadı.</p>
-      </div>
-    );
+  // ---------------- HELPERS ----------------
+  function nowISO() {
+    return new Date().toISOString();
+  }
+  function formatDate(iso) {
+    try {
+      const d = new Date(iso);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = d.getFullYear();
+      return `${dd}.${mm}.${yy}`;
+    } catch {
+      return "";
+    }
+  }
+  function toNum(v) {
+    const n = Number(String(v ?? "").replace(",", ".").replace(/[^0-9.]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+  function toInt(v) {
+    return Math.max(0, Math.floor(toNum(v)));
+  }
+  function roundUpThousands(n) {
+    const x = Number(n || 0);
+    return Math.ceil(x / 1000) * 1000;
+  }
+  function currency(n) {
+    try {
+      return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(Number(n || 0));
+    } catch {
+      return `${Math.round(Number(n || 0))} ₺`;
+    }
   }
 
-  // State update helpers
-  const updateProject = useCallback(
-    (updater) => {
-      setState((prev) => ({
-        ...prev,
-        projects: prev.projects.map((p) => (p.id === projectId ? updater(p) : p)),
-      }));
-    },
-    [setState, projectId]
-  );
+  function normalizeType(t) {
+    const x = String(t || "").toLowerCase().trim();
+    if (x.includes("mutfak") || x.includes("kitchen")) return "Mutfak";
+    if (x.includes("kahve") || x.includes("coffee")) return "Kahve Köşesi";
+    if (x.includes("hilton")) return "Hilton";
+    if (x.includes("seper") || x.includes("separat") || x.includes("divider")) return "Seperatör";
+    if (x.includes("tv")) return "TV Ünitesi";
+    if (x.includes("kapı") || x.includes("kapi") || x.includes("door")) return "Kapı";
+    if (x.includes("süpür") || x.includes("supur") || x.includes("skirting")) return "Süpürgelik";
+    if (x.includes("sade") || x.includes("other") || x.includes("custom")) return "Sade Kalem";
+    return t || "Sade Kalem";
+  }
 
-  const removeItem = useCallback(
-    (itemId) => {
-      updateProject((p) => ({ ...p, items: (p.items || []).filter((i) => i.id !== itemId) }));
-    },
-    [updateProject]
-  );
+  function materialLabel(m) {
+    if (m === "MDFLAM") return "MDFLAM";
+    if (m === "HGloss") return "High Gloss";
+    if (m === "LakPanel") return "Lak Panel";
+    return "Lake";
+  }
 
-  const nextName = useCallback((baseType, customName, projectItems) => {
+  function uid() {
+    return (crypto?.randomUUID && crypto.randomUUID()) || String(Date.now() + Math.random());
+  }
+
+  function updateProject(updater) {
+    setState((prev) => ({
+      ...prev,
+      projects: (prev.projects || []).map((p) => (p.id === projectId ? updater(p) : p)),
+    }));
+  }
+
+  function removeItem(itemId) {
+    updateProject((p) => ({
+      ...p,
+      items: (p.items || []).filter((i) => i.id !== itemId),
+    }));
+  }
+
+  function nextName(baseType, customName, projectItems) {
     const typeNorm = normalizeType(baseType);
     const existing = (projectItems || []).filter((i) => normalizeType(i.type) === typeNorm);
     const n = existing.length + 1;
     const base = (customName || typeNorm).trim() || typeNorm;
     return n > 1 ? `${base} ${n}` : base;
-  }, []);
+  }
 
-  // CALCS
+  // ---------------- CALCULATORS ----------------
+  function factorFromDims(widthCm, heightCm, depthCm) {
+    const w = Math.max(0, widthCm) / 100;
+    const h = Math.max(0, heightCm) / 100;
+    const d = Math.max(0, depthCm) / 100;
+    return w * h * (1 + d);
+  }
+
   function calcKitchenPrice(data) {
     const shape = data.shape || "Duz";
-    const ceiling = toNum(data.ceilingCm || 260);
+    const ceiling = toNum(data.ceilingCm ?? 260);
 
-    const fridge = toNum(data.fridgeCm || 90);
-    const tallOven = toNum(data.tallOvenCm || 60);
+    const fridge = toNum(data.fridgeCm ?? 90);
+    const tallOven = toNum(data.tallOvenCm ?? 60);
     const tallTotal = fridge + tallOven;
 
     const mat = data.material || "Lake";
@@ -754,22 +132,22 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     let runAltCm = 0;
 
     if (shape === "Duz") {
-      const totalWall = toNum(data.totalWallCm || 600);
+      const totalWall = toNum(data.totalWallCm ?? 600);
       runAltCm = Math.max(0, totalWall - tallTotal);
     }
     if (shape === "L") {
-      const a = toNum(data.wallAcm || 400);
-      const b = toNum(data.wallBcm || 500);
+      const a = toNum(data.wallAcm ?? 400);
+      const b = toNum(data.wallBcm ?? 500);
       runAltCm = Math.max(0, a + b - tallTotal - 60);
     }
     if (shape === "U") {
-      const a = toNum(data.wallAcm || 300);
-      const b = toNum(data.wallBcm || 300);
-      const c = toNum(data.wallCcm || 300);
+      const a = toNum(data.wallAcm ?? 300);
+      const b = toNum(data.wallBcm ?? 300);
+      const c = toNum(data.wallCcm ?? 300);
       runAltCm = Math.max(0, a + b + c - tallTotal - 120);
     }
 
-    const island = toNum(data.islandCm || 0);
+    const island = toNum(data.islandCm ?? 0);
     runAltCm += Math.max(0, island);
 
     const altFactor = (runAltCm / 100) * 1.0 * altDepthFactor;
@@ -788,12 +166,11 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
 
-    const runAltCm = toNum(data.runAltCm || 120);
-    const ceiling = toNum(data.ceilingCm || 260);
+    const runAltCm = toNum(data.runAltCm ?? 120);
+    const ceiling = toNum(data.ceilingCm ?? 260);
 
     const altFactor = (runAltCm / 100) * 1.0 * 1.6;
-
-    const tallCm = toNum(data.tallTotalCm || 0);
+    const tallCm = toNum(data.tallTotalCm ?? 0);
     const tallFactor = (tallCm / 100) * (ceiling / 100) * 1.6;
 
     const hasUpper = data.hasUpper === true;
@@ -825,8 +202,8 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
 
     let extra = 0;
     if (tip === "Tip3") {
-      extra += factorFromDims(toNum(data.wmW || 60), toNum(data.wmH || 200), toNum(data.wmD || 60));
-      extra += factorFromDims(toNum(data.panW || 45), toNum(data.panH || 200), toNum(data.panD || 60));
+      extra += factorFromDims(toNum(data.wmW ?? 60), toNum(data.wmH ?? 200), toNum(data.wmD ?? 60));
+      extra += factorFromDims(toNum(data.panW ?? 45), toNum(data.panH ?? 200), toNum(data.panD ?? 60));
     }
 
     const factor = (base + extra) * (coeff.hilton || 1);
@@ -836,31 +213,31 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   function calcSimplePrice(data) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
-    const factor = factorFromDims(toNum(data.w || 100), toNum(data.h || 100), toNum(data.d || 60));
+    const factor = factorFromDims(toNum(data.w ?? 100), toNum(data.h ?? 100), toNum(data.d ?? 60));
     return { factor, price: factor * unit };
   }
 
   function calcSeperatorPrice(data) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
-    const factor = factorFromDims(toNum(data.w || 100), toNum(data.h || 250), toNum(data.d || 10)) * (coeff.seperator || 1);
+    const factor = factorFromDims(toNum(data.w ?? 100), toNum(data.h ?? 250), toNum(data.d ?? 10)) * (coeff.seperator || 1);
     return { factor, price: factor * unit };
   }
 
   function calcTvPrice(data) {
     const mat = data.material || "Lake";
     const unit = materialPrices[mat] || 0;
-    const factor = factorFromDims(toNum(data.w || 300), toNum(data.h || 250), toNum(data.d || 40)) * (coeff.tv || 1);
+    const factor = factorFromDims(toNum(data.w ?? 300), toNum(data.h ?? 250), toNum(data.d ?? 40)) * (coeff.tv || 1);
     return { factor, price: factor * unit };
   }
 
   function calcDoorPrice(data) {
-    const qty = Math.max(0, Math.floor(toNum(data.qty || 1)));
+    const qty = Math.max(0, Math.floor(toNum(data.qty ?? 1)));
     return { factor: qty, price: qty * doorUnit };
   }
 
   function calcSkirtingPrice(data) {
-    const m = Math.max(0, toNum(data.m || 10));
+    const m = Math.max(0, toNum(data.m ?? 10));
     return { factor: m, price: m * skirtingUnit };
   }
 
@@ -877,12 +254,19 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     return calcSimplePrice(data);
   }
 
+  // ---------------- COMPUTEDS ----------------
   const itemsComputed = useMemo(() => {
     return (project?.items || []).map((it) => {
       const r = computeItem(it);
-      return { ...it, type: normalizeType(it.type), _rawPrice: r.price, _price: roundUpThousands(r.price), _factor: r.factor };
+      return {
+        ...it,
+        type: normalizeType(it.type),
+        _rawPrice: r.price,
+        _price: roundUpThousands(r.price),
+        _factor: r.factor,
+      };
     });
-  }, [project?.items, materialPrices, coeff, doorUnit, skirtingUnit]);
+  }, [project?.items, state.settings]);
 
   const accessoriesTotalRaw = useMemo(() => {
     let total = 0;
@@ -898,62 +282,572 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
   const itemsTotal = useMemo(() => roundUpThousands(itemsComputed.reduce((s, it) => s + (it._price || 0), 0)), [itemsComputed]);
   const grandTotal = useMemo(() => roundUpThousands(itemsTotal + accessoriesTotal), [itemsTotal, accessoriesTotal]);
 
+  const offerDate = project?.offerDateISO || project?.createdAtISO || nowISO();
   const code = `${project?.projectNumber || ""}${project?.currentVersion || "A"}`;
 
-  const bumpVersion = useCallback(() => {
+  function bumpVersion() {
     updateProject((p) => {
       const cur = String(p.currentVersion || "A").toUpperCase();
       const cc = cur.charCodeAt(0);
       const next = cc >= 65 && cc < 90 ? String.fromCharCode(cc + 1) : cur;
       return { ...p, currentVersion: next, offerDateISO: nowISO() };
     });
-  }, [updateProject]);
+  }
 
-  // Drawer handlers
-  const openDrawer = useCallback((type) => {
+  // ---------------- STYLES (Corporate / White) ----------------
+  const S = {
+    page: { minHeight: "100vh", background: "#f7f8fb", color: "#0b1220", padding: 16 },
+    container: { maxWidth: 820, margin: "0 auto" },
+
+    topBar: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      alignItems: "flex-start",
+      background: "#fff",
+      border: "1px solid #e9edf3",
+      borderRadius: 18,
+      padding: 14,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+    },
+
+    title: { fontWeight: 950, fontSize: 16, letterSpacing: 0.2 },
+    sub: { fontSize: 12, color: "#5b6472", fontWeight: 800, marginTop: 4 },
+
+    btn: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #e5e9f0",
+      background: "#fff",
+      fontWeight: 900,
+      cursor: "pointer",
+    },
+    btnPrimary: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #111827",
+      background: "#111827",
+      color: "#fff",
+      fontWeight: 950,
+      cursor: "pointer",
+    },
+    btnGhost: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid transparent",
+      background: "transparent",
+      fontWeight: 950,
+      cursor: "pointer",
+      color: "#111827",
+    },
+    danger: {
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid rgba(220,38,38,0.20)",
+      background: "#fff",
+      color: "#b91c1c",
+      fontWeight: 950,
+      cursor: "pointer",
+    },
+
+    tabsWrap: { display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" },
+    tab: (a) => ({
+      padding: "10px 12px",
+      borderRadius: 999,
+      border: "1px solid #e5e9f0",
+      background: a ? "#111827" : "#fff",
+      color: a ? "#fff" : "#111827",
+      fontWeight: 950,
+      cursor: "pointer",
+    }),
+
+    card: {
+      marginTop: 12,
+      borderRadius: 18,
+      border: "1px solid #e9edf3",
+      background: "#fff",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+    },
+    cardBody: { padding: 14 },
+
+    list: { display: "grid", gap: 10, marginTop: 12 },
+    itemCard: { borderRadius: 16, border: "1px solid #eef1f6", background: "#fff", padding: 12 },
+
+    mini: { fontSize: 12, color: "#5b6472", fontWeight: 800 },
+
+    fieldLabel: { fontSize: 12, color: "#334155", fontWeight: 950 },
+    input: {
+      width: "100%",
+      padding: 11,
+      borderRadius: 12,
+      border: "1px solid #e5e9f0",
+      background: "#fff",
+      color: "#111827",
+      outline: "none",
+      fontWeight: 900,
+    },
+    select: {
+      width: "100%",
+      padding: 11,
+      borderRadius: 12,
+      border: "1px solid #e5e9f0",
+      background: "#fff",
+      color: "#111827",
+      outline: "none",
+      fontWeight: 900,
+    },
+    grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+    grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 },
+
+    drawerBack: { position: "fixed", inset: 0, background: "rgba(2,6,23,0.35)", zIndex: 50 },
+    drawer: {
+      position: "fixed",
+      top: 0,
+      right: 0,
+      height: "100vh",
+      width: "min(520px, 94vw)",
+      background: "#fff",
+      borderLeft: "1px solid #e9edf3",
+      zIndex: 60,
+      display: "flex",
+      flexDirection: "column",
+      boxShadow: "-20px 0 60px rgba(0,0,0,0.15)",
+    },
+    drawerHead: { padding: 14, borderBottom: "1px solid #eef1f6", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 },
+    drawerBody: { padding: 14, overflow: "auto", flex: 1 },
+    drawerFoot: { padding: 14, borderTop: "1px solid #eef1f6", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+    badge: { display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 999, border: "1px solid #e5e9f0", background: "#fff", fontWeight: 950, fontSize: 12, color: "#111827" },
+  };
+
+  if (!project) {
+    return (
+      <div style={S.page}>
+        <div style={S.container}>
+          <button style={S.btn} onClick={onBack}>← Projeler</button>
+          <div style={{ marginTop: 10 }}>Proje bulunamadı.</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------- DRAWER: TYPES & INIT ----------------
+  const itemTypes = ["Mutfak", "Kahve Köşesi", "Hilton", "Sade Kalem", "Seperatör", "TV Ünitesi", "Kapı", "Süpürgelik"];
+
+  function initDraft(type) {
     const t = normalizeType(type);
     setDraftType(t);
     setDraftName("");
-    setDraftData(makeDraftDefaults(t));
+
+    let base = {};
+    if (t === "Mutfak") {
+      base = {
+        shape: "Duz",
+        totalWallCm: 600,
+        wallAcm: 400,
+        wallBcm: 500,
+        wallCcm: 300,
+        ceilingCm: 260,
+        fridgeCm: 90,
+        tallOvenCm: 60,
+        islandCm: 0,
+        upperMode: "IkiKat",
+        material: "Lake",
+      };
+    } else if (t === "Kahve Köşesi") {
+      base = { runAltCm: 120, ceilingCm: 260, tallTotalCm: 0, hasUpper: true, hasBazali: false, material: "Lake" };
+    } else if (t === "Hilton") {
+      base = { tip: "Tip1", size: "80", mirrorCabinet: false, wmW: 60, wmH: 200, wmD: 60, panW: 45, panH: 200, panD: 60, material: "Lake" };
+    } else if (t === "Seperatör") {
+      base = { w: 100, h: 250, d: 10, material: "Lake" };
+    } else if (t === "TV Ünitesi") {
+      base = { w: 300, h: 250, d: 40, material: "Lake" };
+    } else if (t === "Kapı") {
+      base = { qty: 1 };
+    } else if (t === "Süpürgelik") {
+      base = { m: 10 };
+    } else {
+      base = { w: 100, h: 100, d: 60, material: "Lake" };
+    }
+
+    // Important: keep both ref + committed state in sync
+    draftDataRef.current = { ...base };
+    setDraftData({ ...base });
+  }
+
+  function openDrawer(type) {
+    initDraft(type);
     setDrawerOpen(true);
-  }, []);
+  }
+  function closeDrawerNoSave() {
+    setDrawerOpen(false);
+  }
 
-  const closeDrawerNoSave = useCallback(() => setDrawerOpen(false), []);
+  // ---------------- INPUT COMPONENT (FIX FOCUS) ----------------
+  /**
+   * DraftInput:
+   * - Local value while typing (no parent state updates on each key)
+   * - Commit to parent draftData on Blur or Enter
+   * This prevents "typing 1 char -> keyboard closes" on Windows/mobile.
+   */
+  function DraftInput({ label, field, placeholder, numeric = false, integer = false, disabled = false }) {
+    const initial = draftDataRef.current?.[field];
+    const [val, setVal] = useState(initial === undefined || initial === null ? "" : String(initial));
+    const mountedRef = useRef(false);
 
-  const saveDraftAsItem = useCallback(() => {
+    // When drawer type changes / re-init, update local
+    useEffect(() => {
+      const next = draftDataRef.current?.[field];
+      setVal(next === undefined || next === null ? "" : String(next));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draftType, drawerOpen]);
+
+    // keep ref in sync while typing (still no rerender)
+    useEffect(() => {
+      if (!mountedRef.current) {
+        mountedRef.current = true;
+        return;
+      }
+      // live typing into ref:
+      draftDataRef.current = { ...draftDataRef.current, [field]: val };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [val]);
+
+    function commit() {
+      const raw = val;
+      let committed = raw;
+
+      if (numeric) committed = toNum(raw);
+      if (integer) committed = toInt(raw);
+
+      draftDataRef.current = { ...draftDataRef.current, [field]: committed };
+      setDraftData((p) => ({ ...p, [field]: committed }));
+    }
+
+    return (
+      <label style={{ display: "grid", gap: 6 }}>
+        <div style={S.fieldLabel}>{label}</div>
+        <input
+          style={S.input}
+          value={val}
+          placeholder={placeholder}
+          disabled={disabled}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+              // keep focus (don’t close keyboard)
+              e.currentTarget.focus();
+            }
+          }}
+        />
+      </label>
+    );
+  }
+
+  function saveDraftAsItem() {
     const id = uid();
+
+    // commit all live ref fields into state one last time:
+    const live = draftDataRef.current || {};
+    // normalize numeric fields by type (so future computations are stable)
+    let data = { ...live };
+
+    if (draftType === "Kapı") data.qty = toInt(live.qty);
+    if (draftType === "Süpürgelik") data.m = toNum(live.m);
+
+    // For numeric dimension-based types, convert common fields
+    const numFields = ["totalWallCm","wallAcm","wallBcm","wallCcm","ceilingCm","fridgeCm","tallOvenCm","islandCm","runAltCm","tallTotalCm","wmW","wmH","wmD","panW","panH","panD","w","h","d"];
+    for (const k of numFields) {
+      if (data[k] !== undefined && data[k] !== null && data[k] !== "" && typeof data[k] !== "number") {
+        data[k] = toNum(data[k]);
+      }
+    }
+
     updateProject((p) => {
       const name = nextName(draftType, draftName || draftType, p.items || []);
-      const newItem = { id, type: draftType, name, data: { ...(draftData || {}) } };
+      const newItem = { id, type: draftType, name, data };
       return { ...p, items: [...(p.items || []), newItem] };
     });
+
     setDrawerOpen(false);
-  }, [updateProject, nextName, draftType, draftName, draftData]);
+  }
 
-  const setAccessoryQty = useCallback(
-    (accessoryId, qty) => {
-      const safeQty = Math.max(0, Math.floor(qty));
-      updateProject((p) => {
-        const list = [...(p.accessories || [])];
-        const idx = list.findIndex((x) => x.accessoryId === accessoryId);
-        if (idx === -1) {
-          if (safeQty > 0) list.push({ accessoryId, quantity: safeQty });
-        } else {
-          if (safeQty <= 0) list.splice(idx, 1);
-          else list[idx] = { ...list[idx], quantity: safeQty };
-        }
-        return { ...p, accessories: list };
-      });
-    },
-    [updateProject]
-  );
+  function setAccessoryQty(accessoryId, qty) {
+    const safeQty = Math.max(0, Math.floor(qty));
+    updateProject((p) => {
+      const list = [...(p.accessories || [])];
+      const idx = list.findIndex((x) => x.accessoryId === accessoryId);
+      if (idx === -1) {
+        if (safeQty > 0) list.push({ accessoryId, quantity: safeQty });
+      } else {
+        if (safeQty <= 0) list.splice(idx, 1);
+        else list[idx] = { ...list[idx], quantity: safeQty };
+      }
+      return { ...p, accessories: list };
+    });
+  }
 
-  const computePreviewPrice = useCallback(() => {
-    const tmp = computeItem({ type: draftType, data: draftData || {} });
-    return roundUpThousands(tmp.price);
-  }, [draftType, draftData, materialPrices, coeff, doorUnit, skirtingUnit]);
+  // ---------------- DRAWER UI ----------------
+  function DraftMaterialPicker() {
+    if (draftType === "Kapı" || draftType === "Süpürgelik") return null;
+    const v = draftDataRef.current?.material || "Lake";
+    return (
+      <label style={{ display: "grid", gap: 6 }}>
+        <div style={S.fieldLabel}>Malzeme</div>
+        <select
+          style={S.select}
+          value={v}
+          onChange={(e) => {
+            const next = e.target.value;
+            draftDataRef.current = { ...draftDataRef.current, material: next };
+            setDraftData((p) => ({ ...p, material: next }));
+          }}
+        >
+          <option value="MDFLAM">MDFLAM</option>
+          <option value="HGloss">High Gloss</option>
+          <option value="LakPanel">Lak Panel</option>
+          <option value="Lake">Lake</option>
+        </select>
+      </label>
+    );
+  }
 
-  // Drawer UI
+  function DraftPreview() {
+    const tmp = computeItem({ type: draftType, data: draftData });
+    return (
+      <div style={{ borderRadius: 16, border: "1px solid #eef1f6", background: "#fbfcfe", padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <div style={S.mini}>Ön İzleme</div>
+          <div style={{ fontWeight: 950 }}>{currency(roundUpThousands(tmp.price))}</div>
+        </div>
+        <div style={{ marginTop: 6, ...S.mini }}>
+          {draftType === "Kapı" ? "Malzeme: Lake" : draftType === "Süpürgelik" ? "Malzeme: Lake" : `Malzeme: ${materialLabel(draftData.material || "Lake")}`}
+        </div>
+      </div>
+    );
+  }
+
+  function DraftForm() {
+    const d = draftDataRef.current || {};
+
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <label style={{ display: "grid", gap: 6 }}>
+          <div style={S.fieldLabel}>Kalem Adı</div>
+          <input style={S.input} value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder={draftType} />
+        </label>
+
+        <DraftMaterialPicker />
+
+        {draftType === "Mutfak" && (
+          <>
+            <div style={S.grid2}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <div style={S.fieldLabel}>Şekil</div>
+                <select
+                  style={S.select}
+                  value={d.shape || "Duz"}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    draftDataRef.current = { ...draftDataRef.current, shape: next };
+                    setDraftData((p) => ({ ...p, shape: next }));
+                  }}
+                >
+                  <option value="Duz">Düz</option>
+                  <option value="L">L</option>
+                  <option value="U">U</option>
+                </select>
+              </label>
+
+              <DraftInput label="Tavan (cm)" field="ceilingCm" numeric />
+            </div>
+
+            {(d.shape || "Duz") === "Duz" && <DraftInput label="Toplam duvar (cm)" field="totalWallCm" numeric />}
+
+            {((d.shape || "Duz") === "L" || (d.shape || "Duz") === "U") && (
+              <div style={S.grid3}>
+                <DraftInput label="Duvar A (cm)" field="wallAcm" numeric />
+                <DraftInput label="Duvar B (cm)" field="wallBcm" numeric />
+                <DraftInput label="Duvar C (cm)" field="wallCcm" numeric disabled={(d.shape || "Duz") !== "U"} />
+              </div>
+            )}
+
+            <div style={S.grid3}>
+              <DraftInput label="Buzdolabı (cm)" field="fridgeCm" numeric />
+              <DraftInput label="Boy ankastre (cm)" field="tallOvenCm" numeric />
+              <DraftInput label="Ada (cm)" field="islandCm" numeric />
+            </div>
+
+            <label style={{ display: "grid", gap: 6 }}>
+              <div style={S.fieldLabel}>Üst dolap modu</div>
+              <select
+                style={S.select}
+                value={d.upperMode || "IkiKat"}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  draftDataRef.current = { ...draftDataRef.current, upperMode: next };
+                  setDraftData((p) => ({ ...p, upperMode: next }));
+                }}
+              >
+                <option value="IkiKat">2 Katman (70 + 40)</option>
+                <option value="Full">Full</option>
+                <option value="Yok">Yok / Raf</option>
+              </select>
+            </label>
+          </>
+        )}
+
+        {draftType === "Kahve Köşesi" && (
+          <>
+            <div style={S.grid2}>
+              <DraftInput label="Alt dolap eni (cm)" field="runAltCm" numeric />
+              <DraftInput label="Tavan (cm)" field="ceilingCm" numeric />
+            </div>
+
+            <div style={S.grid2}>
+              <DraftInput label="Boy dolap toplam eni (cm)" field="tallTotalCm" numeric />
+              <label style={{ display: "grid", gap: 6 }}>
+                <div style={S.fieldLabel}>Üst dolap</div>
+                <select
+                  style={S.select}
+                  value={d.hasUpper ? "Evet" : "Hayır"}
+                  onChange={(e) => {
+                    const next = e.target.value === "Evet";
+                    draftDataRef.current = { ...draftDataRef.current, hasUpper: next };
+                    setDraftData((p) => ({ ...p, hasUpper: next }));
+                  }}
+                >
+                  <option value="Evet">Var</option>
+                  <option value="Hayır">Yok</option>
+                </select>
+              </label>
+            </div>
+
+            <label style={{ display: "grid", gap: 6 }}>
+              <div style={S.fieldLabel}>Bazalı üst dolap</div>
+              <select
+                style={S.select}
+                value={d.hasBazali ? "Evet" : "Hayır"}
+                onChange={(e) => {
+                  const next = e.target.value === "Evet";
+                  draftDataRef.current = { ...draftDataRef.current, hasBazali: next };
+                  setDraftData((p) => ({ ...p, hasBazali: next }));
+                }}
+              >
+                <option value="Hayır">Yok</option>
+                <option value="Evet">Var</option>
+              </select>
+            </label>
+          </>
+        )}
+
+        {draftType === "Hilton" && (
+          <>
+            <div style={S.grid2}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <div style={S.fieldLabel}>Tip</div>
+                <select
+                  style={S.select}
+                  value={d.tip || "Tip1"}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    draftDataRef.current = { ...draftDataRef.current, tip: next };
+                    setDraftData((p) => ({ ...p, tip: next }));
+                  }}
+                >
+                  <option value="Tip1">Tip 1</option>
+                  <option value="Tip2">Tip 2</option>
+                  <option value="Tip3">Tip 3</option>
+                </select>
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <div style={S.fieldLabel}>Lavabo</div>
+                <select
+                  style={S.select}
+                  value={String(d.size || "80")}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    draftDataRef.current = { ...draftDataRef.current, size: next };
+                    setDraftData((p) => ({ ...p, size: next }));
+                  }}
+                >
+                  <option value="60">60</option>
+                  <option value="80">80</option>
+                  <option value="100">100</option>
+                  <option value="120">120</option>
+                </select>
+              </label>
+            </div>
+
+            <label style={{ display: "grid", gap: 6 }}>
+              <div style={S.fieldLabel}>Ayna dolap</div>
+              <select
+                style={S.select}
+                value={d.mirrorCabinet ? "Evet" : "Hayır"}
+                onChange={(e) => {
+                  const next = e.target.value === "Evet";
+                  draftDataRef.current = { ...draftDataRef.current, mirrorCabinet: next };
+                  setDraftData((p) => ({ ...p, mirrorCabinet: next }));
+                }}
+              >
+                <option value="Hayır">Yok</option>
+                <option value="Evet">Var</option>
+              </select>
+            </label>
+
+            {(d.tip || "Tip1") === "Tip3" && (
+              <>
+                <div style={S.fieldLabel}>Çamaşır kabini (cm)</div>
+                <div style={S.grid3}>
+                  <DraftInput label="En" field="wmW" numeric placeholder="60" />
+                  <DraftInput label="Boy" field="wmH" numeric placeholder="200" />
+                  <DraftInput label="Derinlik" field="wmD" numeric placeholder="60" />
+                </div>
+
+                <div style={S.fieldLabel}>Kiler dolabı (cm)</div>
+                <div style={S.grid3}>
+                  <DraftInput label="En" field="panW" numeric placeholder="45" />
+                  <DraftInput label="Boy" field="panH" numeric placeholder="200" />
+                  <DraftInput label="Derinlik" field="panD" numeric placeholder="60" />
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {(draftType === "TV Ünitesi" || draftType === "Seperatör" || draftType === "Sade Kalem") && (
+          <>
+            <div style={S.fieldLabel}>Ölçüler (cm)</div>
+            <div style={S.grid3}>
+              <DraftInput label="En" field="w" numeric />
+              <DraftInput label="Boy" field="h" numeric />
+              <DraftInput label="Derinlik" field="d" numeric />
+            </div>
+          </>
+        )}
+
+        {draftType === "Kapı" && (
+          <>
+            <DraftInput label="Adet" field="qty" integer placeholder="1" />
+            <div style={S.mini}>Detay: Lake</div>
+          </>
+        )}
+
+        {draftType === "Süpürgelik" && (
+          <>
+            <DraftInput label="Metre" field="m" numeric placeholder="10" />
+            <div style={S.mini}>Detay: Lake</div>
+          </>
+        )}
+
+        <DraftPreview />
+      </div>
+    );
+  }
+
   function Drawer() {
     if (!drawerOpen) return null;
 
@@ -962,42 +856,29 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
         <div style={S.drawerBack} onClick={closeDrawerNoSave} />
         <div style={S.drawer} onClick={(e) => e.stopPropagation()}>
           <div style={S.drawerHead}>
-            <div>
+            <div style={{ display: "grid", gap: 6 }}>
               <div style={{ fontWeight: 950, fontSize: 14 }}>Kalem Ekle</div>
-              <div style={S.mini}>{draftType}</div>
+              <div style={S.badge}>Tür: {draftType}</div>
             </div>
             <button style={S.btn} onClick={closeDrawerNoSave}>Kapat</button>
           </div>
 
           <div style={S.drawerBody}>
             <div style={{ display: "grid", gap: 12 }}>
-              <div>
-                <div style={S.mini}>Kalem Türü</div>
+              <label style={{ display: "grid", gap: 6 }}>
+                <div style={S.fieldLabel}>Kalem Türü</div>
                 <select
                   style={S.select}
                   value={draftType}
-                  onChange={(e) => {
-                    const t = normalizeType(e.target.value);
-                    setDraftType(t);
-                    setDraftName("");
-                    setDraftData(makeDraftDefaults(t));
-                  }}
+                  onChange={(e) => initDraft(e.target.value)}
                 >
-                  {itemTypes.map((x) => (
-                    <option key={x} value={x}>{x}</option>
+                  {itemTypes.map((t) => (
+                    <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
-              </div>
+              </label>
 
-              <DraftForm
-                S={S}
-                draftType={draftType}
-                draftName={draftName}
-                setDraftName={setDraftName}
-                draftData={draftData}
-                setDraftData={setDraftData}
-                computePreviewPrice={computePreviewPrice}
-              />
+              <DraftForm />
             </div>
           </div>
 
@@ -1010,19 +891,301 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
     );
   }
 
-  // Render
-  return (
-    <div style={S.page}>
-      <div style={S.container}>
-        <div style={S.topRow}>
-          <button style={S.btn} onClick={onBack}>← Projeler</button>
-          <div style={{ textAlign: "right" }}>
-            <div style={S.title}>{project.name}</div>
-            <div style={S.mini}>{project.customerName} • Kod: {code}</div>
+  // ---------------- OFFER VIEW (A4 fit + export) ----------------
+  function OfferView() {
+    const company = settings.companyInfo || {};
+    const logoUrl = company.logoDataUrl || "";
+
+    const A4_W = 794;
+    const A4_H = 1123;
+
+    const sheetRef = useRef(null);
+    const contentRef = useRef(null);
+    const [fitScale, setFitScale] = useState(1);
+    const [exporting, setExporting] = useState(false);
+
+    useLayoutEffect(() => {
+      const el = contentRef.current;
+      if (!el) return;
+      const h = el.scrollHeight || el.getBoundingClientRect().height || 0;
+      if (!h) return;
+
+      const s = Math.min(1, A4_H / h);
+      setFitScale(Math.max(0.78, s));
+    }, [
+      itemsComputed.length,
+      (project?.accessories || []).length,
+      company.logoDataUrl,
+      project?.customerName,
+      project?.phone,
+      project?.address,
+    ]);
+
+    async function exportJpg() {
+      try {
+        setExporting(true);
+        await new Promise((r) => setTimeout(r, 50));
+
+        const node = sheetRef.current;
+        if (!node) return;
+
+        const canvas = await html2canvas(node, {
+          backgroundColor: "#ffffff",
+          scale: 3,
+          useCORS: true,
+        });
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${project?.projectNumber || "teklif"}${project?.currentVersion || "A"}-${(project?.customerName || "musteri").replaceAll(" ", "_")}.jpg`;
+        a.click();
+      } finally {
+        setExporting(false);
+      }
+    }
+
+    const ST = {
+      shell: {
+        width: A4_W,
+        minHeight: A4_H,
+        background: "#fff",
+        border: "1px solid #e9edf3",
+        borderRadius: 18,
+        boxShadow: "0 14px 45px rgba(0,0,0,0.08)",
+        overflow: "hidden",
+      },
+      pad: { padding: 22 },
+      headerGrid: {
+        display: "grid",
+        gridTemplateColumns: "1.1fr 1.2fr 0.7fr",
+        gap: 14,
+        alignItems: "start",
+      },
+      logoBox: {
+        width: 130,
+        height: 58,
+        borderRadius: 12,
+        border: "1px solid #eef1f6",
+        background: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      },
+      logoImg: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" },
+
+      companyName: { fontWeight: 950, fontSize: 13.2, color: "#0f172a" },
+      companyLine: { fontSize: 10.8, color: "#475569", fontWeight: 750, lineHeight: 1.45 },
+
+      midTitle: { fontWeight: 950, fontSize: 15.2, color: "#0f172a", textAlign: "center", marginTop: 2 },
+      midCustomer: { fontWeight: 900, fontSize: 12.2, color: "#334155", textAlign: "center", marginTop: 4 },
+      midSmall: { fontSize: 10.8, color: "#475569", fontWeight: 750, textAlign: "center", marginTop: 4 },
+
+      rightTitle: { fontWeight: 950, letterSpacing: 1, fontSize: 13, color: "#0f172a", textAlign: "right" },
+      rightMeta: { fontSize: 10.8, color: "#475569", fontWeight: 850, textAlign: "right", marginTop: 4 },
+
+      divider: { marginTop: 12, borderTop: "1px solid #eef1f6" },
+
+      tableWrap: { marginTop: 12, border: "1px solid #eef1f6", borderRadius: 14, overflow: "hidden" },
+      head: { display: "grid", gridTemplateColumns: "1fr 160px", background: "#f8fafc" },
+      th: { padding: 10, fontWeight: 950, fontSize: 11, color: "#334155" },
+      row: { display: "grid", gridTemplateColumns: "1fr 160px", borderTop: "1px solid #eef1f6" },
+      td: { padding: 10, fontSize: 11, color: "#0f172a" },
+      tdRight: { padding: 10, fontSize: 11, color: "#0f172a", textAlign: "right", fontWeight: 950 },
+
+      totals: { marginTop: 12, display: "grid", gap: 6 },
+      totalRow: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "#334155", fontWeight: 850 },
+      grandRow: { display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 950, color: "#0f172a", marginTop: 2 },
+
+      footerGrid: { marginTop: 14, display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: 12, alignItems: "end" },
+      notes: { fontSize: 10.6, color: "#475569", fontWeight: 750, lineHeight: 1.45, whiteSpace: "pre-line" },
+      signBox: { border: "1px dashed #cbd5e1", borderRadius: 14, padding: 12, minHeight: 70 },
+      signTitle: { fontSize: 10.6, fontWeight: 950, color: "#334155" },
+
+      actionBar: { marginTop: 10, display: "flex", justifyContent: "flex-end" },
+      exportBtn: {
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid #e5e9f0",
+        background: "#fff",
+        fontWeight: 950,
+        cursor: "pointer",
+      },
+    };
+
+    return (
+      <div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div ref={sheetRef} style={ST.shell}>
+            <div
+              ref={contentRef}
+              style={{
+                ...ST.pad,
+                transform: `scale(${fitScale})`,
+                transformOrigin: "top left",
+                width: A4_W / fitScale,
+              }}
+            >
+              <div style={ST.headerGrid}>
+                <div>
+                  <div style={ST.logoBox}>
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="logo" style={ST.logoImg} />
+                    ) : (
+                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 950 }}>LOGO</div>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={ST.companyName}>{company.name || "Şirket Adı"}</div>
+                    {company.address ? <div style={ST.companyLine}>{company.address}</div> : null}
+                    {company.phone ? <div style={ST.companyLine}>{company.phone}</div> : null}
+                    {company.email ? <div style={ST.companyLine}>{company.email}</div> : null}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={ST.midTitle}>{project.name}</div>
+                  <div style={ST.midCustomer}>{project.customerName}</div>
+                  {project.phone || project.address ? (
+                    <div style={ST.midSmall}>
+                      {project.phone ? `Tel: ${project.phone}` : ""}
+                      {project.phone && project.address ? " • " : ""}
+                      {project.address ? `Adres: ${project.address}` : ""}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div>
+                  <div style={ST.rightTitle}>TEKLİF</div>
+                  <div style={ST.rightMeta}>Tarih: {formatDate(offerDate)}</div>
+                  <div style={ST.rightMeta}>Kod: {code}</div>
+                </div>
+              </div>
+
+              <div style={ST.divider} />
+
+              <div style={ST.tableWrap}>
+                <div style={ST.head}>
+                  <div style={ST.th}>Kalem / Detay</div>
+                  <div style={{ ...ST.th, textAlign: "right" }}>Tutar</div>
+                </div>
+
+                {itemsComputed.map((it) => {
+                  const t = normalizeType(it.type);
+                  const d = it.data || {};
+                  let detail = "";
+
+                  if (t === "Kapı") detail = "Lake";
+                  else if (t === "Süpürgelik") detail = "Lake";
+                  else if (d.material) detail = materialLabel(d.material);
+
+                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
+                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
+
+                  return (
+                    <div key={it.id} style={ST.row}>
+                      <div style={ST.td}>
+                        <div style={{ fontWeight: 950, fontSize: 11.6 }}>{it.name}</div>
+                        {detail ? <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 750, marginTop: 2 }}>{detail}</div> : null}
+                      </div>
+                      <div style={ST.tdRight}>{currency(it._price || 0)}</div>
+                    </div>
+                  );
+                })}
+
+                {project.accessories?.length > 0 && (
+                  <div style={ST.row}>
+                    <div style={ST.td}>
+                      <div style={{ fontWeight: 950, fontSize: 11.6 }}>Aksesuarlar</div>
+                      <div style={{ fontSize: 10.6, color: "#475569", fontWeight: 750, marginTop: 2 }}>
+                        {(project.accessories || [])
+                          .map((r) => {
+                            const def = accessoriesDefs.find((a) => a.id === r.accessoryId);
+                            if (!def) return null;
+                            return `${def.name} x${r.quantity || 0}`;
+                          })
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </div>
+                    </div>
+                    <div style={ST.tdRight}>{currency(accessoriesTotal)}</div>
+                  </div>
+                )}
+              </div>
+
+              <div style={ST.totals}>
+                <div style={ST.totalRow}>
+                  <div>Kalemler Toplamı</div>
+                  <div>{currency(itemsTotal)}</div>
+                </div>
+                <div style={ST.totalRow}>
+                  <div>Aksesuar Toplamı</div>
+                  <div>{currency(accessoriesTotal)}</div>
+                </div>
+                <div style={ST.grandRow}>
+                  <div>Genel Toplam</div>
+                  <div>{currency(grandTotal)}</div>
+                </div>
+              </div>
+
+              <div style={ST.footerGrid}>
+                <div style={ST.notes}>
+                  {"KDV dahil değildir.\nTermin/Montaj süresi teklif onaylandığı andan itibaren 60 gündür.\nMutfak tezgahı, evye, batarya ve lavabo taşı fiyata dahil değildir."}
+                </div>
+
+                <div style={ST.signBox}>
+                  <div style={ST.signTitle}>Müşteri İmza</div>
+                  <div style={{ height: 34, marginTop: 10 }} />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div style={S.tabs}>
+        <div style={{ ...ST.actionBar, opacity: exporting ? 0 : 1, pointerEvents: exporting ? "none" : "auto" }}>
+          <button style={ST.exportBtn} onClick={exportJpg}>JPEG Çıktı Al</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------- ITEMS LIST DETAILS ----------------
+  function itemDetailText(it) {
+    const t = normalizeType(it.type);
+    const d = it.data || {};
+    let detail = "";
+
+    if (t === "Kapı") detail = `Lake • Adet: ${d.qty || 1}`;
+    else if (t === "Süpürgelik") detail = `Lake • ${d.m || 0} m`;
+    else if (d.material) detail = materialLabel(d.material);
+
+    if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
+    if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
+
+    return detail;
+  }
+
+  // ---------------- RENDER ----------------
+  return (
+    <div style={S.page}>
+      <div style={S.container}>
+        <div style={S.topBar}>
+          <div>
+            <button style={S.btnGhost} onClick={onBack}>← Projeler</button>
+            <div style={S.title}>{project.name}</div>
+            <div style={S.sub}>
+              {project.customerName} • Kod: <b>{code}</b>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <div style={S.badge}>Kalemler: {currency(itemsTotal)}</div>
+            <div style={S.badge}>Genel: {currency(grandTotal)}</div>
+          </div>
+        </div>
+
+        <div style={S.tabsWrap}>
           <button style={S.tab(tab === "kalemler")} onClick={() => setTab("kalemler")}>Kalemler</button>
           <button style={S.tab(tab === "aksesuarlar")} onClick={() => setTab("aksesuarlar")}>Aksesuarlar</button>
           <button style={S.tab(tab === "teklif")} onClick={() => setTab("teklif")}>Teklif</button>
@@ -1048,38 +1211,26 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               <div style={S.card}>
                 <div style={S.cardBody}>
                   <div style={{ fontWeight: 950 }}>Henüz kalem yok</div>
-                  <div style={S.mini}>“+ Kalem Ekle” ile ekle, ölçüleri sağ panelde doldur, Kaydet.</div>
+                  <div style={S.mini}>“+ Kalem Ekle” ile ekle. Drawer’da ölçüleri gir, Kaydet.</div>
                 </div>
               </div>
             ) : (
-              <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                {itemsComputed.map((it) => {
-                  const t = normalizeType(it.type);
-                  const d = it.data || {};
-                  let detail = "";
+              <div style={S.list}>
+                {itemsComputed.map((it) => (
+                  <div key={it.id} style={S.itemCard}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 950, fontSize: 13 }}>{it.name}</div>
+                        <div style={{ marginTop: 4, ...S.mini }}>{itemDetailText(it)}</div>
+                      </div>
 
-                  if (t === "Kapı") detail = `Lake • Adet: ${d.qty || 1}`;
-                  else if (t === "Süpürgelik") detail = `Lake • ${d.m || 0} m`;
-                  else if (d.material) detail = materialLabel(d.material);
-
-                  if (t === "Mutfak") detail = `${detail}${detail ? " • " : ""}${d.shape || "Düz"}`;
-                  if (t === "Hilton") detail = `${detail}${detail ? " • " : ""}${d.tip || "Tip1"} • ${d.size || "80"}`;
-
-                  return (
-                    <div key={it.id} style={S.box}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.name}</div>
-                          {detail ? <div style={S.mini}>{detail}</div> : null}
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontWeight: 950 }}>{currency(it._price || 0)}</div>
-                          <button style={{ ...S.dangerBtn, marginTop: 8 }} onClick={() => removeItem(it.id)}>Sil</button>
-                        </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontWeight: 950 }}>{currency(it._price || 0)}</div>
+                        <button style={{ ...S.danger, marginTop: 8 }} onClick={() => removeItem(it.id)}>Sil</button>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
 
@@ -1096,21 +1247,21 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <div style={S.list}>
               {accessoriesDefs
                 .filter((a) => a.isActive || (project.accessories || []).some((x) => x.accessoryId === a.id))
                 .sort((a, b) => String(a.name).localeCompare(String(b.name), "tr"))
                 .map((a) => {
                   const qty = (project.accessories || []).find((x) => x.accessoryId === a.id)?.quantity || 0;
                   return (
-                    <div key={a.id} style={S.box}>
+                    <div key={a.id} style={S.itemCard}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                         <div>
                           <div style={{ fontWeight: 950 }}>{a.name}</div>
                           <div style={S.mini}>{a.isActive ? "Aktif" : "Pasif"} • {a.unitPrice} ₺</div>
                         </div>
-                        <div style={{ width: 120 }}>
-                          <input style={S.input} value={String(qty)} onChange={(e) => setAccessoryQty(a.id, toNum(e.target.value))} inputMode="numeric" />
+                        <div style={{ width: 140 }}>
+                          <input style={S.input} value={String(qty)} onChange={(e) => setAccessoryQty(a.id, toNum(e.target.value))} />
                           <div style={{ ...S.mini, textAlign: "right", marginTop: 6 }}>adet</div>
                         </div>
                       </div>
@@ -1134,17 +1285,7 @@ export default function ProjectScreen({ projectId, state, setState, onBack }) {
           </>
         )}
 
-        {tab === "teklif" && (
-          <OfferView
-            settings={settings}
-            project={project}
-            itemsComputed={itemsComputed}
-            accessoriesDefs={accessoriesDefs}
-            itemsTotal={itemsTotal}
-            accessoriesTotal={accessoriesTotal}
-            grandTotal={grandTotal}
-          />
-        )}
+        {tab === "teklif" && <OfferView />}
       </div>
     </div>
   );
