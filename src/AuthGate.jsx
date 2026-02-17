@@ -102,44 +102,9 @@ export default function AuthGate({ children }) {
     }
   }
 
-  async function signOut() {
-    try {
-      await supabase.auth.signOut();
-      // onAuthStateChange zaten session'ı null yapacak → login ekranı gelecek
-    } catch {
-      // çok gerek yok ama sessiz geçelim
-    }
-  }
-
-  // ✅ Login olduysa: app + sağ altta çıkış butonu
+  // ✅ Login olduysa: SADECE app’i göster (sağ alttaki çıkış butonu KALDIRILDI)
   if (session) {
-    return (
-      <>
-        {children}
-
-        {/* Mini Çıkış Butonu */}
-        <button
-          onClick={signOut}
-          style={{
-            position: "fixed",
-            right: 14,
-            bottom: 14,
-            zIndex: 9999,
-            padding: "10px 12px",
-            borderRadius: 14,
-            border: "1px solid rgba(0,0,0,0.12)",
-            background: "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(10px)",
-            boxShadow: "0 14px 40px rgba(0,0,0,0.15)",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-          title="Çıkış yap"
-        >
-          Çıkış
-        </button>
-      </>
-    );
+    return <>{children}</>;
   }
 
   // Login değilse: Login UI
