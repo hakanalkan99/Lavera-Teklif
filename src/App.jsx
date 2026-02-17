@@ -11,12 +11,6 @@ import SettingsScreen from "./screens/SettingsScreen";
 // -----------------------------
 // Route
 // -----------------------------
-/**
- * route örnekleri:
- * { name: "projects" }
- * { name: "project", projectId: "..." }
- * { name: "settings" }
- */
 function makeRouteProjects() {
   return { name: "projects" };
 }
@@ -34,7 +28,7 @@ export default function App() {
   const [route, setRoute] = useState(makeRouteProjects());
 
   // Cloud state
-  const [state, setState] = useState(null); // PersistedState gelecek
+  const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Header durumları
@@ -45,10 +39,9 @@ export default function App() {
   const saveTimerRef = useRef(null);
   const lastSavedHashRef = useRef("");
 
-  // Kullanıcı bilgisi (header’da göstermek istersen diye)
+  // Kullanıcı bilgisi
   const [userEmail, setUserEmail] = useState("");
 
-  // Basit hash (state değişti mi anlamak için)
   function hashState(obj) {
     try {
       return JSON.stringify(obj);
@@ -75,9 +68,7 @@ export default function App() {
         }
       } catch (e) {
         console.error("Cloud load error:", e);
-        if (alive) {
-          setLoading(false);
-        }
+        if (alive) setLoading(false);
       }
     })();
 
@@ -90,24 +81,20 @@ export default function App() {
   useEffect(() => {
     if (!state) return;
 
-    // aynı hash ise kaydetme
     const h = hashState(state);
     if (h === lastSavedHashRef.current) return;
 
-    // debounce
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       try {
         await saveCloudState(state);
         lastSavedHashRef.current = h;
 
-        // kaydedildi rozetini göster
         setCloudSaved(true);
         if (cloudSavedTimerRef.current) clearTimeout(cloudSavedTimerRef.current);
         cloudSavedTimerRef.current = setTimeout(() => setCloudSaved(false), 2200);
       } catch (e) {
         console.error("Cloud save error:", e);
-        // kaydetme başarısızsa rozet göstermiyoruz
       }
     }, 650);
 
@@ -119,13 +106,25 @@ export default function App() {
   const header = useMemo(() => {
     return (
       <>
-        {/* küçük animasyon css’i burada gömülü: ek dosya istemez */}
+        {/* küçük animasyon css’i */}
         <style>{`
           @keyframes fadeInOut {
             0% { opacity: 0; transform: translateY(-6px); }
             10% { opacity: 1; transform: translateY(0); }
             80% { opacity: 1; }
             100% { opacity: 0; }
+          }
+
+          /*
+            ✅ FIX: Sağ altta çıkan (position: fixed) Çıkış butonunu gizle.
+            Bu buton App.jsx'te yok, muhtemelen <Screen> içinde basılıyor.
+            Header’daki buton sticky olduğu için etkilenmez.
+          */
+          button[title="Çıkış"][style*="position: fixed"],
+          button[aria-label="Çıkış"][style*="position: fixed"],
+          a[title="Çıkış"][style*="position: fixed"],
+          a[aria-label="Çıkış"][style*="position: fixed"] {
+            display: none !important;
           }
         `}</style>
 
@@ -172,11 +171,13 @@ export default function App() {
             )}
 
             <button
+              id="header-logout"
+              aria-label="Header Çıkış"
+              title="Header Çıkış"
               onClick={async () => {
                 try {
                   await supabase.auth.signOut();
                 } catch {}
-                // auth değişince zaten AuthGate login’e döner ama garanti olsun:
                 window.location.reload();
               }}
               style={{
@@ -188,7 +189,6 @@ export default function App() {
                 fontWeight: 800,
                 cursor: "pointer",
               }}
-              title="Çıkış"
             >
               Çıkış
             </button>
@@ -203,7 +203,6 @@ export default function App() {
       <Screen>
         {header}
 
-        {/* Loading */}
         {loading || !state ? (
           <div style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
             <div
@@ -221,7 +220,6 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* ROUTES */}
             {route.name === "projects" && (
               <ProjectsScreen
                 state={state}
